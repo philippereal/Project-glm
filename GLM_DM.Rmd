@@ -1657,15 +1657,13 @@ Tous les résultats sont basés sur des hypothèses fondamentales liés au terme
 Hypothèses liées au terme d’erreur :
 
 - Les erreurs sont centrées E(erreur) = 0.
-- La distribution est gaussienne
 - La variance est constante (σ2)
 - Les erreurs (Erreur_i)1≤i≤n sont indépendantes.
 
 Pour vérifier ces hypothèses on va regarder des graphiques des résidus qui sont des approximations de ces erreurs.
 
 - L’hypothèse d’indépendance est considérée comme vérifiée lorsque chaque donnée correspond à un échantillonnage indépendant ou à une expérience physique menée dans des conditions indépendantes. Ce qui est le cas ici. 
-- On peut souvent se passer de l’hypothèse de normalité général quand le nombre le données est important. Ce qui est bien le cas. 
-- La plupart des graphiques montrent bien une répartition linéaire centrèe en 0.
+- La plupart des graphiques montrent bien une répartition linéaire centrée en 0.
 
 ```{r echo=TRUE, fig.height=5, fig.width=10,echo=FALSE}
 res1 <- residuals(m_StepBwdFwd,type="deviance") #résidus de déviance
