@@ -1,0 +1,1918 @@
+
+---
+title: "Modèle linéaire généralisé et Choix de modèles"
+author: "Philippe Real"
+date: "30/8/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+  #toc: yes
+  #pdf_document
+  #html_document: default
+  #word_document: default
+
+#local({
+#  r <- getOption("repos")
+#  r["CRAN"] <- "https://cran.r-project.org"
+#  options(repos = r)
+#})
+#getOption("repos")
+#rmarkdown::render("GLM_DMFinal.V1.Rmd")
+```
+
+```{r, include=FALSE}
+options(tinytex.verbose = TRUE)
+```
+
+```{r r_utile, eval=FALSE, message=FALSE, warning=FALSE}
+#### Instalation des packages.
+#for manipulate data (transform to dataframe)
+install.packages("bindrcpp")
+install.packages("pillar")
+install.packages("tidyverse")
+install.packages("tibble")
+install.packages("sm")
+install.packages("leaps")
+install.packages("stringr", dependencies=TRUE)
+install.packages("readxl")
+install.packages("VIM")
+install.packages("FactoMineR")
+install.packages("ggplot2")
+install.packages("factoextra")
+install.packages("corrplot")
+install.packages("devtools")
+#install.packages("usethis")
+install.packages("plyr")
+install.packages("rgl")
+install.packages("rJava")
+install.packages("glmulti")
+install.packages("questionr")
+install.packages("faraway")
+
+```
+
+```{r include=FALSE}
+
+#chargement des librairies utiles
+#library(bindrcpp)
+#library(pillar)
+
+# library(tidyverse)
+# library(tibble)
+# library(sm)
+# library(leaps)
+
+#library(stringr)
+#library(readxl)
+#library(VIM)
+#library(FactoMineR)
+#library(ggplot2)
+#library(factoextra)
+# library(corrplot)
+
+# library(devtools)
+# library(plyr)
+# library(glmulti)
+# library(questionr)
+```
+
+## Introduction
+Après avoir chargé les données  au §1 on construit le modèle saturé au §2, modèle : m_sature.
+Ensuite on effectue une analyse PCA au §3 pour mieux appréhender les données.
+De cette analyse des données on va construire un modèle alternatif au modèle saturé, le modèle PCA: m_PCA
+Ensuite au §4 vient la sélection des variables. Pour celà on va utiliser le package MASS et la méthode step.
+Tout d'abord à partir du modèle saturé: m_sature et aussi à partir du modèle m_PCA, comme alternative.
+La pré-selection effectuée avec l'analyse PCA va aussi nous permettre d'utiliser d'autres méthodes.
+Comme la méthode leaps du package leaps. En effet bon nombre de méthodes ne sont applicables qu'à partir de 30 variables.
+Puis au §5 on essaiera une analyse croisée et comparaison de modèles.
+Après avoir choisi et validé notre modèle au §6, on effectuera la prédiction au §7.
+Ceci conduira à la production, à partir du modèle retenu, d'un fichier de prédiction avec nos données de test.
+
+
+## 1. Lecture et préparation des données, premières analyses
+
+```{r meteoTrain_summary, include= FALSE}
+rm(list=ls())
+meteoTrainAll <- read.csv("meteo.train.csv")
+summary(meteoTrainAll)
+
+```
+
+Le nom des colonnes est trop long gêne dans les graphiques et la lecture des données.
+On va renommer les colonnes :
+
+  Nouveau Nom   | Ancien Nom
+----------------|------------------------
+CC.high_max     |  High.Cloud.Cover.daily.max..high.cld.lay.
+CC.high_mean    |  High.Cloud.Cover.daily.mean..high.cld.lay. 
+CC.high_min     |  High.Cloud.Cover.daily.min..high.cld.lay.   
+                |                        
+CC.low_max      |  Low.Cloud.Cover.daily.max..low.cld.lay.     
+CC.low_mean     |  Low.Cloud.Cover.daily.mean..low.cld.lay.    
+CC.low_min      |  Low.Cloud.Cover.daily.min..low.cld.lay.     
+                |
+MSL_max         |  Mean.Sea.Level.Pressure.daily.max..MSL.     
+MSL_mean        |  Mean.Sea.Level.Pressure.daily.mean..MSL.    
+MSL_min         |  Mean.Sea.Level.Pressure.daily.min..MSL.   
+                |
+CC.mid_max      |  Medium.Cloud.Cover.daily.max..mid.cld.lay.  
+CC.mid_mean     |  Medium.Cloud.Cover.daily.mean..mid.cld.lay. 
+CC.mid_min      |  Medium.Cloud.Cover.daily.min..mid.cld.lay.  
+                |
+Humidity_max    |  Relative.Humidity.daily.max..2.m.above.gnd. 
+Humidity_mean   |  Relative.Humidity.daily.mean..2.m.above.gnd.
+Humidity_min    |  Relative.Humidity.daily.min..2.m.above.gnd. 
+                |
+Rad_sum         |  Shortwave.Radiation.daily.sum..sfc.         
+Snow_sum        |  Snowfall.amount.raw.daily.sum..sfc.         
+Sunshine_sum    |  Sunshine.Duration.daily.sum..sfc.           
+                | 
+Temp_max        |  Temperature.daily.max..2.m.above.gnd.       
+Temp_mean       |  Temperature.daily.mean..2.m.above.gnd.      
+Temp_min        |  Temperature.daily.min..2.m.above.gnd.       
+                |
+Tot.CC_max      |  Total.Cloud.Cover.daily.max..sfc.           
+Tot.CC_mean     |  Total.Cloud.Cover.daily.mean..sfc.          
+Tot.CC_min      |  Total.Cloud.Cover.daily.min..sfc.      
+                |
+Tot.Prcp_sum    |  Total.Precipitation.daily.sum..sfc.         
+                |
+WDir.10m_mean   |  Wind.Direction.daily.mean..10.m.above.gnd.  
+WDir.80m_mean   |  Wind.Direction.daily.mean..80.m.above.gnd.  
+WDir.900mb_mean |  Wind.Direction.daily.mean..900.mb.          
+                |
+WGust_max       |  Wind.Gust.daily.max..sfc.                   
+WGust_mean      |  Wind.Gust.daily.mean..sfc.                  
+WGust_min       |  Wind.Gust.daily.min..sfc.       
+                |
+WS.10m_max      |  Wind.Speed.daily.max..10.m.above.gnd.       
+WS.80m_max      |  Wind.Speed.daily.max..80.m.above.gnd.       
+WS.900mb_max    |  Wind.Speed.daily.max..900.mb.
+                | 
+WS.10m_mean     |  Wind.Speed.daily.mean..10.m.above.gnd.      
+WS.80m_mean     |  Wind.Speed.daily.mean..80.m.above.gnd.      
+WS.900mb_mean   |  Wind.Speed.daily.mean..900.mb.              
+                |
+WS.10m_min      |  Wind.Speed.daily.min..10.m.above.gnd.    
+WS.80m_min      |  Wind.Speed.daily.min..80.m.above.gnd.       
+WS.900mb_min    |  Wind.Speed.daily.min..900.mb.
+
+
+Il y a certaienement une manière plus "intelligente", par exemple à l'aide de %>% des filter et des recherche de caractères...
+En tout cas faire très attention au rennomage pour garder la cohérence des variables et des données. A bien vérifier donc. 
+Ce choix est certainement discutable mais les noms de variables sont vraiment trop longs.
+
+
+```{r meteoTrain_renameCol, include= FALSE, echo="FALSE"}
+library(tidyverse)
+renameCol<-function(data)
+{
+ data <- data %>% rename(CC.high_max =  High.Cloud.Cover.daily.max..high.cld.lay.)
+ data <- data %>% rename(CC.high_mean=High.Cloud.Cover.daily.mean..high.cld.lay.) 
+ data <- data %>% rename(CC.high_min=High.Cloud.Cover.daily.min..high.cld.lay.)   
+                                     
+ data <- data %>% rename(CC.low_max=Low.Cloud.Cover.daily.max..low.cld.lay.)     
+ data <- data %>% rename(CC.low_mean = Low.Cloud.Cover.daily.mean..low.cld.lay.)    
+ data <- data %>% rename(CC.low_min=Low.Cloud.Cover.daily.min..low.cld.lay.)     
+
+ data <- data %>% rename(MSL_max=Mean.Sea.Level.Pressure.daily.max..MSL.)     
+ data <- data %>% rename(MSL_mean = Mean.Sea.Level.Pressure.daily.mean..MSL.)    
+ data <- data %>% rename(MSL_min=Mean.Sea.Level.Pressure.daily.min..MSL.)   
+ 
+ data <- data %>% rename(CC.mid_max =   Medium.Cloud.Cover.daily.max..mid.cld.lay.)  
+ data <- data %>% rename(CC.mid_mean=Medium.Cloud.Cover.daily.mean..mid.cld.lay.) 
+ data <- data %>% rename(CC.mid_min =   Medium.Cloud.Cover.daily.min..mid.cld.lay.)  
+
+ data <- data %>% rename(Humidity_max =   Relative.Humidity.daily.max..2.m.above.gnd.) 
+ data <- data %>% rename(Humidity_mean = Relative.Humidity.daily.mean..2.m.above.gnd.)
+ data <- data %>% rename(Humidity_min=Relative.Humidity.daily.min..2.m.above.gnd.) 
+
+ data <- data %>% rename(Radiation_sum = Shortwave.Radiation.daily.sum..sfc.)         
+ data <- data %>% rename(Snow_sum=Snowfall.amount.raw.daily.sum..sfc.)         
+ data <- data %>% rename(Sunshine_sum=Sunshine.Duration.daily.sum..sfc.)           
+ 
+ data <- data %>% rename(Temp_max=Temperature.daily.max..2.m.above.gnd.)       
+ data <- data %>% rename(Temp_mean=Temperature.daily.mean..2.m.above.gnd.)      
+ data <- data %>% rename(Temp_min=Temperature.daily.min..2.m.above.gnd.)       
+
+ data <- data %>% rename(Tot.CC_max=Total.Cloud.Cover.daily.max..sfc.)           
+ data <- data %>% rename(Tot.CC_mean=Total.Cloud.Cover.daily.mean..sfc.)          
+ data <- data %>% rename(Tot.CC_min=Total.Cloud.Cover.daily.min..sfc.)      
+ 
+ data <- data %>% rename(Tot.Prcp_sum=Total.Precipitation.daily.sum..sfc.)         
+
+ data <- data %>% rename(WDir.10m_mean = Wind.Direction.daily.mean..10.m.above.gnd.)  
+ data <- data %>% rename(WDir.80m_mean=Wind.Direction.daily.mean..80.m.above.gnd.)  
+ data <- data %>% rename(WDir.900mb_mean=Wind.Direction.daily.mean..900.mb.)          
+  
+ data <- data %>% rename(WGust_max=Wind.Gust.daily.max..sfc.)                   
+ data <- data %>% rename(WGust_mean=Wind.Gust.daily.mean..sfc.)                  
+ data <- data %>% rename(WGust_min=Wind.Gust.daily.min..sfc.)       
+  
+ data <- data %>% rename(WS.10m_max=Wind.Speed.daily.max..10.m.above.gnd.)       
+ data <- data %>% rename(WS.80m_max=Wind.Speed.daily.max..80.m.above.gnd.)       
+ data <- data %>% rename(WS.900mb_max=Wind.Speed.daily.max..900.mb.)
+ 
+ data <- data %>% rename(WS.10m_mean=Wind.Speed.daily.mean..10.m.above.gnd.)      
+ data <- data %>% rename(WS.80m_mean=Wind.Speed.daily.mean..80.m.above.gnd.)      
+ data <- data %>% rename(WS.900mb_mean=Wind.Speed.daily.mean..900.mb.)              
+ 
+ data <- data %>% rename(WS.10m_min=Wind.Speed.daily.min..10.m.above.gnd.)      
+ data <- data %>% rename(WS.80m_min=Wind.Speed.daily.min..80.m.above.gnd.)       
+ data <- data %>% rename(WS.900mb_min=Wind.Speed.daily.min..900.mb.)
+ return(data)
+}
+
+```
+ 
+```{r r_summar2}
+meteoTrainAll<-renameCol(meteoTrainAll)
+summary(meteoTrainAll)
+```
+
+- On remarque qu'il pleut 1 jour sur deux en moyenne.
+
+- Les variable Hour et Minutes valent toutes 0 et peuvent donc être éliminées directement.
+
+```{r r_summar2.1,  echo=FALSE}
+meteoTrainAll2<-meteoTrainAll[,-5]
+meteoTrainAll2<-meteoTrainAll2[,-5]
+meteoTrain<-meteoTrainAll2
+#View(meteoTrain)
+```
+
+## 2. Construction du modèle saturé
+
+On est dans le cadre d'un modèle logistique simple. La variable à estimer, pluie.demain est une variable binaire 0-1.
+Et suit une loi de Bernoulli de probabilité approximative 1/2.
+Pour estimer la variable pluie.demain on va donc effectuer une regression logistique sous R en utilisant la fonction glm(). Par défaut glm utilise comme fonction de lien la fonction logit.
+Les deux modèles extrêmes sont les modèles saturé et le modèle null (où toutes les coefficients des covraiables sont nulles). On ne s'intéresse ici qu'au modèle saturé qui va nous permetrre de construire nos modèles intermédiares à k<44 covariables.
+
+```{r logit_sat, include= TRUE}
+logit_sat = glm(pluie.demain ~ . ,  family = binomial,  data = meteoTrain, singular.ok = TRUE )
+```
+
+
+#### Estimateur des parametres du modèle -> coef
+Aucuns des coéfficients n'est à NA, toutes les variables sont bien interprétées.
+```{r logit_sat2, include=TRUE}
+coef(logit_sat)[is.na(coef(logit_sat))]
+table(meteoTrain$Hour,meteoTrain$Minute)
+```
+#### Anova
+```{r logit_sat3, include=TRUE}
+anova(logit_sat,test="LR")
+anova(logit_sat,test="Cp")
+```
+
+On obtient le premier modèle "saturé": m_sature
+
+```{r m_sature01, include= TRUE}
+
+m_sature = glm(formula = pluie.demain ~ (X+Year+Month+Day+
+    Temp_mean + Humidity_mean + MSL_mean + Tot.Prcp_sum + Snow_sum + 
+    Tot.CC_mean + CC.high_mean + CC.mid_mean + CC.low_mean + 
+    Sunshine_sum + Radiation_sum + WS.10m_mean + WDir.10m_mean + 
+    WS.80m_mean + WDir.80m_mean + WS.900mb_mean + WDir.900mb_mean + 
+    WGust_mean + Temp_max + Temp_min + Humidity_max + Humidity_min + 
+    MSL_max + MSL_min + Tot.CC_max + Tot.CC_min + CC.high_max + 
+    CC.high_min + CC.mid_max + CC.mid_min + CC.low_max + CC.low_min + 
+    WS.10m_max + WS.10m_min + WS.80m_max + WS.80m_min + WS.900mb_max + 
+    WS.900mb_min + WGust_max + WGust_min),  family = binomial,  data = meteoTrain)
+
+summary(m_sature)
+
+```
+
+#### Points influents / abérrants
+
+```{r  echo=FALSE}
+p <- length(m_sature$coef)
+n <- nrow(meteoTrain)
+plot(influence(m_sature)$hat,type="h",ylab="hii")
+abline(h=c(2*p/n,3*p/n),col=c("blue","red"))
+```
+
+
+```{r include=TRUE}
+which(influence(m_sature)$hat>0.2)
+```
+
+```{r echo=FALSE}
+meteoTrain[95,]
+meteoTrain[270,]
+meteoTrain[716,]
+```
+
+```{r echo=FALSE}
+plot(cooks.distance(m_sature),type="h",ylab="Distance de Cook")
+```
+
+```{r include=TRUE}
+which(cooks.distance(m_sature)>0.03)
+```
+
+Il conviendrait d'analyser pourquoi ces jours sont si particuliers et l'élimintaion direste n'est pas conseillée.
+Cependant vu l'e nombre de jours'échantillon relativement important, on va tout de même les supprimer.
+Sauvegarde des données et suppression des lignes 95,270,716 et 397
+```{r  echo=FALSE}
+
+meteoTrainSave <- meteoTrain
+#meteoTrain <- meteoTrainSave
+meteoTrain<-meteoTrain[-716,]
+meteoTrain<-meteoTrain[-397,]
+meteoTrain<-meteoTrain[-270,]
+meteoTrain<-meteoTrain[-95,]
+```
+
+
+Rechargement du modèle saturé:
+```{r include= TRUE}
+
+m_sature = glm(formula = pluie.demain ~ (X+Year+Month+Day+
+    Temp_mean + Humidity_mean + MSL_mean + Tot.Prcp_sum + Snow_sum + 
+    Tot.CC_mean + CC.high_mean + CC.mid_mean + CC.low_mean + 
+    Sunshine_sum + Radiation_sum + WS.10m_mean + WDir.10m_mean + 
+    WS.80m_mean + WDir.80m_mean + WS.900mb_mean + WDir.900mb_mean + 
+    WGust_mean + Temp_max + Temp_min + Humidity_max + Humidity_min + 
+    MSL_max + MSL_min + Tot.CC_max + Tot.CC_min + CC.high_max + 
+    CC.high_min + CC.mid_max + CC.mid_min + CC.low_max + CC.low_min + 
+    WS.10m_max + WS.10m_min + WS.80m_max + WS.80m_min + WS.900mb_max + 
+    WS.900mb_min + WGust_max + WGust_min),  family = binomial,  data = meteoTrain)
+```
+
+#### Détection de colinéarité
+Les corrélations positives sont affichées en bleu et les corrélations négatives en rouge. L’intensité
+de la couleur et la taille des cercles sont proportionnelles aux coefficients de corrélation.
+
+```{r echo=FALSE, fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
+require(corrplot)
+meteoTrainmat=data.matrix(meteoTrain)
+mcor<-cor(meteoTrainmat)
+corrplot(mcor, type="upper", order="hclust", tl.col="black", tl.srt=45)
+```
+
+On retrouve des corrélations fortes entre le groupe de vriables de type vents/vitesse/rafale. Ce qui est normale et attendu.
+Entre nébulosité et rayonnement une corrélation négative importante.
+Mais dans l'ensemble et entre nos différents types de variables, il y a finalement assez peu de corélations.
+Ce qui est une bonne chose. Notament pour utiliser des tests anova entre modèles emboîtés.
+
+#### Etude des variables temporelles: Day, Month, Year, X
+
+```{r include= TRUE}
+logit_sat_Day = glm(pluie.demain ~ . -Day ,  family = binomial,  data = meteoTrain )
+logit_sat_DayMonth = glm(pluie.demain ~ . -Day -Month,  family = binomial,  data = meteoTrain )
+logit_sat_DayMonthYear = glm(pluie.demain ~ . -Day -Month -Year,  family = binomial,  data = meteoTrain )
+logit_sat_DayMonthYearX = glm(pluie.demain ~ . -Day -Month -Year -X,  family = binomial,  data = meteoTrain )
+```
+
+#### Annova, test de déviance entre modèles emboîtés
+```{r eval= FALSE}
+anova(m_sature,logit_sat_Day,test="LRT")
+anova(m_sature,logit_sat_DayMonth,test="LRT")
+anova(m_sature,logit_sat_DayMonthYear,test="LRT")
+anova(m_sature,logit_sat_DayMonthYearX,test="LRT")
+```
+
+Les tests anova successifs sur les modèles emboîtés, où l'on supprime à chaque étape l'une des variables temporelles: Day, Month, Year, X montrent que l'on peut se passer de ces variables. la p-value (Pr(>Chi)) est importante > 0.6 dans tous les cas. On conserve donc l'hypothèse H0 de nullité des coéfficients, c'est à dire le plus petit modèle. 
+
+On peut étudier et faire une première analyse des données : PCA en utilsant le package FactoMineR.
+Et essayer à partir de cette analyse de sélectionner des variables en fonction de leur bonne contribution et représentation aux axes principaux.
+
+## 3. Analyse PCA
+
+Les deux variable Year et X (ordonnancement) sont passée en variables quanitatives supplémentaires.
+Ce ne sont pas des variables météorologiques.
+Après une première étude, ces variables perturbent plus l'analyse qu'elles n'apportent d'information.
+En particulier au niveau de l'analyse du 5ème axe.
+On a vu aussi en fin du chapitre précédent §2, avec des test anova, que les variables temporelles ne semblent pas sigificatives.
+Ce ne sont pas aussi des variables météorologiques, on va aussi les passer en variables quantitatives supplémentaires.
+
+```{r meteoTrain_PCA1, message=FALSE, warning=FALSE}
+library(readxl) 
+library(VIM) 
+library(FactoMineR) 
+library(factoextra)
+library(corrplot)
+
+res.pca.meteoTrain<-PCA(meteoTrain,graph=FALSE, quali.sup=45, quanti.sup = 1:4) 
+
+summary(res.pca.meteoTrain)
+```
+
+
+### 3.1 Choix du nombre d'axes
+
+On cherche une cassure/décroissance au niveau des inerties.
+Une première cassure dès la 1ere dimension, puis après les 3 premières dimensions.
+puis une 3ème après la 6ème dimension. Et une 4ème au nivau de la 11ème dimension.
+On entrevoit des difficultés à réduire le nombre de dimensions. La décroissance est lente.
+
+Il va être difficile de restreindre le nombre des variables explicatives dans notre modèle glm.
+
+```{r meteoTrain_PCA111, echo=FALSE}
+barplot(res.pca.meteoTrain$eig[,2],main="Eigenvalues",names.arg=1:nrow(res.pca.meteoTrain$eig))
+```
+
+#### Décomposition de la variabilité par axes:
+Pourcentage de l'inertie par rapport aux dimensions (axes).Qui mesure la qualité de représentation des données / axes.
+Ici le 1er axe représente 32% de la variabilité des données.
+Et c'est aussi une mesure de l'importance relative des axes.Ici le 1er exprime 2.5 fois plus que le 2ème.
+
+La décroissance est forte pour les 3 -1ères valeur propres.
+Puis de l'ordre de 5% pour les 4 suivantes.
+Et ensuite la décroissance est régulière.
+
+- les 3 -1ères dimensions expliquent 57% de la variabilité.
+- les 5 -1ères dimensions expliquent 68% de la variabilité.
+- les 9 -1ères dimensions expliquent 80% de la variabilité.
+- les 14 -1ères dimensions expliquent 91% de la variabilité.
+
+
+#### Critère du choix du nombre d'axes:
+Critère du coude atteint au 1er ou 3éme axe.
+Pour le critère de kaiser on regarde la 2ème composante et on compare : variance cumulative >= I/p = 100/40 = 2.5 soit à partir de comp 9.
+Pour le critère des 80% on regarde la 3ème composante: atteint à partir de la dimension 9.
+
+On remarque qu'il est difficle de réduire la dimension.
+On va se contenter d'éudier les 5 premiers axes qui expliquent 68% de l'inertie.
+
+```{r meteoTrain_PCA1.2.1, message=FALSE, warning=FALSE, echo=FALSE}
+round(res.pca.meteoTrain$eig[1:16,],2) 
+```
+
+### 3.2 Analyse des résultats - Graphique des individus et des variables
+
+#### 3.2.1 Projection du nuage des individus (jours de pluie/sec) sur les 2 axes principaux
+
+Le plan principale représente 46 % environ de l'inertie totale.
+Le nuage a une allure régulière. Les données Pluie/sec sont relativement centrées / axe1 et axe2.
+
+```{r meteoTrain_PCA0+, fig.height=7, fig.width=10,  echo=FALSE}
+#Graphique du nuage des individus - qualité de projection sur le plan principal > 0.7
+color <- ifelse(meteoTrain$pluie.demain == TRUE,"#E7B800","#00AFBB")
+
+plot(res.pca.meteoTrain,habillage=45,cex=0.6, select="cos2 0.7", palette = color,axes = 1:2)
+fviz_pca_ind(res.pca.meteoTrain, #Graphique du nuage des individus avec ellipses
+             geom.ind = "point", # show points only (nbut not "text")
+             col.ind = factor(meteoTrain$pluie.demain), # color by groups
+             palette = color,  # "#FC4E07"
+             axes = 1:2,
+             addEllipses = TRUE, # Concentration ellipses
+             legend.title = "Pluie demain")
+
+```
+
+
+#### 3.2.2 Projection des variables sur les 2 axes principaux
+
+```{r meteoTrain_PCA1+, fig.height=7, fig.width=10,  echo=FALSE}
+#Graphique des variables - qualité de projection sur le plan principal > 0.5
+plot(res.pca.meteoTrain,choix="var",habillage=45,cex=0.6, axes=1:2, new.plot=TRUE, select="cos2 0.5")
+plot(res.pca.meteoTrain,choix="var",cex=0.6, axes=1:2,select="coord 20")
+#mise en évidence du degré de contribution
+fviz_pca_var(res.pca.meteoTrain , col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE)
+```
+Les jours secs ont leur éllipse de confiance décalé dans la direction du vecteur "Sunshine Sum"
+
+L'axe 2 oppose les vriables Nébulosité (Cloud Cover) à Sunshine Sum (Ensoleillement)
+
+- Quart Bas/Droit: Contributions > 0 avec la 1ere dimension. 
+On retrouve en majorité des données de type Wind Speed et Wind Gust
+Données très corrélées entre elles et avec le 1er axes.
+Ceux sont ces variables (de type Wind-Speed/Wind-Gust) qui contribue le plus à l'axe 1.
+
+- Quart Haut/Droit:On trouve en majorité des données de catégories Cloud Cover et Wind direction (de manière moins évidentes)
+Aussi Humidity. Contributions principales >0 au 2ème axe.
+
+- Quart Haut/Gauche: Données de type température. Contribution faible à l'une ou l'autre des dimension
+
+- Quart Bas/Gauche: Données radiation et sunshine duration en corrélation négative
+En opposition avec les données de type Cloud Coverage. 
+En effet plus la couverture nuageuse est importante et plus courte est la durée du coucher de soleil ou bien la quantité de radiation.
+
+#### 3.2.3 Autres axes
+##### Projection du nuage des individus (journées) sur les axes 2 et 3
+
+- Le nuage a une allure régulière. Les données Pluie/sec sont relativement centrées / axe2 et axe3.
+Etalement et applatissement le long de l'axe 3.
+
+```{r meteoTrain_PCA23+, fig.height=7, fig.width=7,  echo=FALSE}
+#qualité de projection sur le plan principal > 0.7
+#plot(res.pca.meteoTrain,choix="ind", habillage=45,cex=0.6, axes=2:3, select="cos2 0.5")
+color <- ifelse(meteoTrain$pluie.demain == TRUE,"#E7B800","#00AFBB")
+fviz_pca_ind(res.pca.meteoTrain, geom.ind = "point", # show points only (nbut not "text")
+             col.ind = factor(meteoTrain$pluie.demain), # color by groups
+             palette = color, axes=2:3, addEllipses = TRUE, # Concentration ellipses
+             legend.title = "Pluie demain")
+
+```
+
+```{r meteoTrain_PCA23.2, fig.height=7, fig.width=10, message=FALSE, warning=FALSE, echo=FALSE}
+#plot(res.pca.meteoTrain,choix="var",habillage=45,cex=1.1, axes=2:3, new.plot=TRUE, select="cos2 0.4")
+#plot(res.pca.meteoTrain,choix="var", axes=3:4,select="coord 20")
+fviz_pca_var(res.pca.meteoTrain , col.var = "contrib", axes = 2:3, gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),  repel = TRUE)
+```
+Les variables de type température sont parfaitement corrélées avec l'axe 3.
+En opposition avec la Pression Max: MSL_Max
+
+##### Projection du nuage des individus (journées) sur les axes 3 et 4
+
+- Le nuage a une allure régulière. Les données Pluie/sec sont relativement centrées / axe3 et axe4.
+
+```{r meteoTrain_PCA3+, fig.height=7, fig.width=7,  echo=FALSE}
+#qualité de projection sur le plan principal > 0.7
+#plot(res.pca.meteoTrain,choix="ind", habillage=45,cex=0.6, axes=3:4, select="cos2 0.5")
+color <- ifelse(meteoTrain$pluie.demain == TRUE,"#E7B800","#00AFBB")
+fviz_pca_ind(res.pca.meteoTrain, geom.ind = "point", # show points only (nbut not "text")
+             col.ind = factor(meteoTrain$pluie.demain), # color by groups
+             palette = color, axes=3:4, addEllipses = TRUE, # Concentration ellipses
+             legend.title = "Pluie demain")
+
+```
+
+- Pas de remarques paticulières. Les nuages sont toujours centrés. Le décalage pluie/sec est faible.
+
+```{r meteoTrain_PCA1.302, fig.height=7, fig.width=10, message=FALSE, warning=FALSE, echo=FALSE}
+#plot(res.pca.meteoTrain,choix="var",habillage=45,cex=1.1, axes=3:4, new.plot=TRUE, select="cos2 0.4")
+#plot(res.pca.meteoTrain,choix="var", axes=3:4,select="coord 20")
+fviz_pca_var(res.pca.meteoTrain , col.var = "contrib", axes = 3:4, gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),  repel = TRUE)
+```
+
+
+On va maintenant passer aux analyses automatiques et détaillées de chacun des axes.
+Et étudier la contribution et représentation des variables.
+
+### 3.3 Analyses automatiques
+
+#### 3.3.1 coefficients de corrélation entre chacunes des variables et les 5 premières composantes principales 
+(ce qui correspond aux coordonnées des individus sur les 5 premiers axes)
+
+##### A partir de la fonction dimdesc
+
+```{r meteoTrain_PCA4+, fig.height=15, fig.width=10, include=TRUE}
+dimdesc <- dimdesc(res.pca.meteoTrain, proba=1e-5) #, nbelements = 16)
+dimdesc
+```
+
+##### Graphique de corrélation avec corrplot
+
+```{r meteoTrain_PCAcor_var_dim1, fig.height=12, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
+cor_var_dim<-round(res.pca.meteoTrain$var$coord[,1:5],2) 
+cor_var_dim
+corrplot(cor_var_dim, is.corr = FALSE, tl.col="black", tl.srt=45)
+```
+
+- Axe 1: On remarque que les 3 groupes de variables de type Vent: Wind Speed/Win dir et Win Gust.
+         Et ont toutes une "corrélation" forte et >0 avec la 1ère dimension.
+         De même pour Cloud Cover mais de moindre intensité.
+         Opposition entre les variables de types Vents + Cloud Cover et les autres.
+         Les autres types de variables: MSL/Sunshine duration/Radiation/Temperature ont toutes une "corrélation" <0.
+- Axe 2: Les données de type Cloud Cover ont une "corrélation" >0 assez forte.
+         Les données de type Win Speed et Wind Dir ont une "corrélation" <0 du même ordre.
+- Axe 3: Les variables de type température ont la plus forte "corrélation" >0.
+         Les variables de type MSL ont une "corrélation" <0 importante.
+- Axe 4: Peu de variables ont une corrélation importantes.
+         Excepté pour les variables de type Wind Dir qui ont une corrélation relativement importante.
+- Axe 5: Les variables de type Cloud Cover: CC.Low.min Tot.CC.min
+
+
+#### 3.3.2 Indice de qualité de la représentation cos2
+
+```{r cos2_var_dim1, fig.height=12, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
+cos2_var_dim<-round(res.pca.meteoTrain$var$cos2[,1:5],2) 
+cos2_var_dim
+corrplot(cos2_var_dim, is.corr = FALSE, method="circle", tl.col="black", tl.srt=45)
+```
+
+
+#### 3.3.3 contribution des variables à la construction des axes
+
+```{r meteoTrain_PCAcontrib_var_dim2, fig.height=12, fig.width=8, echo=FALSE}
+contrib_var_dim<-round(res.pca.meteoTrain$var$contrib[,1:5],2) 
+#ordered<-contrib_var_dim[order(contrib_var_dim[,1], decreasing = TRUE),]
+contrib_var_dim
+corrplot(contrib_var_dim, is.corr = FALSE, tl.col="black", tl.srt=45)
+
+```
+
+la contribution est très répartie entre les variables et diffuse pour les 2 premiers axes.
+On trouve surtout les variables de type Wind Speed et Wind Gust pour le 1ère axe.
+Les variables de type Cloud Cover pour le second mais aussi pour le 1ère axe.
+Les variables de type température pour le 3ème axe contribution moyenne.
+Pour le 4ème axe contribution forte de 2 variables Win Dir 10/80 m.
+Les variables Cloud Cover (Nébulosité) contribuent au 5ème axe.
+
+
+#### 3.3.4 Détail - Qualité et Contribution des variables aux axes
+
+##### Détail - Qualité et Contribution des variables au 1er axe
+
+```{r meteoTrain_PCA1.Q1, include=TRUE}
+which(res.pca.meteoTrain$var$contrib[,1]>4.5)
+```
+
+- 1ere Groupe de variables du type Vent avec 35% de la contribution
+WGust_mean, WS.10m_mean, WS.80m_mean, WS.10m_max, WGust_max, WS.80m_max, WS.900mb_mean, WS.900mb_max  (>4.5%)
+plus de 50% pour les données de type Wind Speed / Wind Gust
+- 2ème groupe de variables de type Cloud Coverrage avec plus de 10% pour les données de type Cloud Cover - Tot.CC_mean 5%,CC.low_mean 3%, CC.mid_mean 3%
+- Autres: 7% Sunshine_sum 4%,Radiation_sum 3% mais en corrélation négative
+
+Bonne représentation des variables de type Wind Speed et Wind Gust sur l'axe 1:
+```{r meteoTrain_PCA1.Q2, include=TRUE}
+which(res.pca.meteoTrain$var$cos2[,1]>0.6)
+```
+On retiendra en premier lieu les variables: WS.10m_mean, WS.80m_mean, WS.10m_max, WGust_max, WS.80m_max, WS.900mb_mean, WS.900mb_max
+Puis: Tot.CC_mean, CC.low_mean, CC.mid_mean
+Et enfin: Sunshine_sum, Radiation_sum
+
+```{r meteoTrain_PCAo11, fig.height=5, fig.width=12, echo=FALSE}
+fviz_contrib(res.pca.meteoTrain, choice = "var", axes = 1)
+fviz_cos2(res.pca.meteoTrain, choice = "var", axes = 1)
+```
+
+##### Détail - Qualité et Contribution des variables au 2ème axe
+
+Aucunes des variables ne se détachent nettement.
+```{r meteoTrain_PCAQ.3, include=TRUE}
+which(res.pca.meteoTrain$var$contrib[,2]>3)
+```
+
+Ces variables sont plutôt mal représentées sur l'axe 2 :
+```{r meteoTrain_PCA1.Q3, include=TRUE}
+which(res.pca.meteoTrain$var$cos2[,2]>0.25 )
+which(res.pca.meteoTrain$var$cos2[,2]>0.2 )
+```
+On retiendra principalement: Tot.CC_mean + Humidity_mean + Humidity_min
+On pourrait ajouter: CC.mid_mean + CC.low_mean et WS.10m_min  + WS.80m_min
+A noter qu'un nombre important de variables du 1er axe contribuent aussi au second.
+```{r meteoTrain_PCAo1271, fig.height=5, fig.width=12, echo=FALSE}
+fviz_contrib(res.pca.meteoTrain, choice = "var", axes = 2)
+fviz_cos2(res.pca.meteoTrain, choice = "var", axes = 2)
+```
+
+##### Détail - Qualité et Contribution des variables au 3ème axe
+
+Temp_mean,Temp_max,Temp_min : contribuent à 40% à 50% à la construction de cet axe.
+
+```{r meteoTrain_PCA1.334, include=TRUE}
+which(res.pca.meteoTrain$var$contrib[,3]>12)
+```
+Ces variables sont aussi les mieux représentés sur cette axe. A retenir pour l'explication de l'axe 3.
+Vient ensuite les variables MSL_max, MSL_mean, MSL_min qui expliquent +20% de la contribution.
+Ces variables de type MSL (Pression) sont assez bien représentées avec un cos2 > 0.3
+On pourrait envisager de les retenir.
+Autres: Radiation_sum / Humidity_mean, Humidity_min / CC.high_max, CC.high_mean, CC.mid_max 
+
+```{r meteoTrain_PCA.121, fig.height=5, fig.width=12, echo=FALSE}
+fviz_contrib(res.pca.meteoTrain, choice = "var", axes = 3)
+fviz_cos2(res.pca.meteoTrain, choice = "var", axes = 3)
+```
+
+##### Détail - Qualité et Contribution des variables au le 4ème axe
+
+Cette dimension est expliquée par la direction du vent essentiellement
+WDir.80m_mean, WDir.10m_mean, WDir.900mb_mean 50% de la contribution
+
+```{r meteoTrain_PCAQ.304, include=TRUE}
+which(res.pca.meteoTrain$var$contrib[,4]>22)
+```
+Ensuite en 2ème groupe explicatif viennent les variables de type MSL : MSL_min, MSL_mean, MSL_max avec 15% de la contribution.
+Mais sont mals représentées avec un cos2 proche de 0.1
+Autres: Temp_min / CC.low_max, CC.mid_min, Tot.CC_max
+Pour l'axe 4 comme variable explicative on va garder les variables de type Wind direction:
+WDir.80m_mean, WDir.10m_mean, WDir.900mb_mean
+
+```{r meteoTrain_PCA.21, fig.height=5, fig.width=12, echo=FALSE}
+fviz_contrib(res.pca.meteoTrain, choice = "var", axes = 4)
+fviz_cos2(res.pca.meteoTrain, choice = "var", axes = 4)
+```
+
+##### Détail - Qualité et Contribution des variables au le 5ème axe
+Les variables Cloud Cover (Nébulosité) contribuent le plus au 5ème axe, à hauteur de 50%.
+Tot.CC_min + CC.mid_min + CC.low_min
+
+```{r include=TRUE}
+which(res.pca.meteoTrain$var$contrib[,5]>10)
+```
+
+```{r meteoTrain_PCA0121, fig.height=5, fig.width=12, echo=FALSE}
+fviz_contrib(res.pca.meteoTrain, choice = "var", axes = 5)
+fviz_cos2(res.pca.meteoTrain, choice = "var", axes = 5)
+```
+
+
+Remarque:
+(Sans l'option quanti.sup = [1:4] on aurait Year + X qui représente 60% de l'axe)
+C'est la différence essentielle.
+
+
+### 3.4 Conclusion de l'analyse PCA - Choix des variables et modèle retenu
+
+#### 3.4.1 Variables retenues à l'issue de l'analyse PCA
+Pour expliquer les axes factoriels on va retenir:
+
+- 1er axe : 
+WGust_mean + WS.10m_mean + WS.80m_mean + WS.10m_max + WGust_max + WS.80m_max + WS.900mb_mean + WS.900mb_max
+Tot.CC_mean, CC.low_mean, CC.mid_mean
+Sunshine_sum, Radiation_sum
+- 2ème axe :
+Tot.CC_mean + Humidity_mean
+On pourrait ajouter: CC.mid_mean + CC.low_mean / Humidity_min / WS.10m_min + WS.80m_min
+A noter qu'un nombre important de variables du 1er axe contribuent aussi au second.
+- 3ème axe :
+Temp_mean + Temp_max + Temp_min
+- 4ème axe :
+WDir.80m_mean + WDir.10m_mean + WDir.900mb_mean
+- 5ème axe :
+Tot.CC_min + CC.mid_min + CC.low_min
+(Sans l'option quali.sup = [1:4] on aurait Year + X qui représente 60% de l'axe)
+
+On pourrait ajouter aussi les variables suivantes, qui peuvent apporter une certaine diversification.
+Et qui apparaissent en 2ème ordre dans l'analyse: MSL_min + MSL_max + MSL_mean et Sunshine_sum
+Ainsi que CC.mid_max, Tot.Prcp_sum, Snow_sum et Radiation_sum pour diversification.
+
+#### 3.4.2 Modèle issue de la sélection de variables à partir de l'analyse PCA
+
+
+```{r m_PCA2, include= TRUE}
+# Avec l'option quali.sup=[1:4]
+m_PCA = glm(pluie.demain ~ 
+WGust_mean + WGust_max #1er axe
++ WS.10m_mean + WS.80m_mean + WS.900mb_mean #1er axe
++ WS.10m_max  + WS.80m_max  + WS.900mb_max #1er axe
++ Tot.CC_mean + Humidity_mean + Humidity_min  + #2eme axe 
++ WS.10m_min  + WS.80m_min + #2eme axe 
++ Temp_mean + Temp_max + Temp_min  + #3eme axe
++ WDir.80m_mean + WDir.10m_mean + WDir.900mb_mean + #4eme axe
++ Tot.CC_min + CC.mid_min + CC.low_min #5eme axe
++ CC.mid_max + MSL_max + MSL_mean + MSL_min #divers
++ Sunshine_sum  + Tot.Prcp_sum + Snow_sum + Radiation_sum #divers
+,family = binomial,  data = meteoTrain )
+summary(m_PCA)
+anova(m_PCA,test="LRT")
+```
+
+#### 3.4.3 Corrélations entre variables explicatives
+La première dimension qui représente plus de 32% est expliqué essentiellement par des variables de catégorie vents.
+On peut essayer de regarder les corrélations 2/2 des groupes de variables sélectionnées avec PCA.
+
+
+```{r echo=FALSE, fig.height=12, fig.width=12}
+
+mPCA=cbind( meteoTrain$WGust_mean, meteoTrain$WGust_max,  #1er axe
+  meteoTrain$WS.10m_mean, meteoTrain$WS.80m_mean, meteoTrain$WS.900mb_mean, #1er axe
+  meteoTrain$WS.10m_max, meteoTrain$WS.80m_max,  meteoTrain$WS.900mb_max, #1er axe
+  meteoTrain$Tot.CC_mean, meteoTrain$Humidity_mean, meteoTrain$Humidity_min,  + #2eme axe 
+  meteoTrain$WS.10m_min, meteoTrain$WS.80m_min, #2eme axe 
+  meteoTrain$Temp_mean, meteoTrain$Temp_max,  meteoTrain$Temp_min , #3eme axe
+  meteoTrain$WDir.80m_mean, meteoTrain$WDir.10m_mean, meteoTrain$WDir.900mb_mean,  #4eme axe
+  meteoTrain$Tot.CC_min, meteoTrain$CC.mid_min,  meteoTrain$CC.low_min, #5eme axe
+  meteoTrain$CC.mid_max, meteoTrain$MSL_max, meteoTrain$MSL_mean, meteoTrain$MSL_min, #divers
+  meteoTrain$Sunshine_sum, meteoTrain$Tot.Prcp_sum, meteoTrain$Snow_sum, meteoTrain$Radiation_sum) #divers
+    
+colnames(mPCA) <- c("WGust_mean", "WGust_max", #1er axe
+                    "WS.10m_mean", "WS.80m_mean","WS.900mb_mean", #1er axe
+                    "WS.10m_max","WS.80m_max","WS.900mb_max", #1er axe
+                    "Tot.CC_mean", "Humidity_mean", "Humidity_min", #2eme axe 
+                    "WS.10m_min","WS.80m_min", #2eme axe 
+                    "Temp_mean" , "Temp_max", "Temp_min", #3eme axe
+                    "WDir.80m_mean",  "WDir.10m_mean",  "WDir.900mb_mean", #4eme axe
+                    "Tot.CC_min", "CC.mid_min", "CC.low_min", #5eme axe
+                    "CC.mid_max",  "MSL_max","MSL_mean","MSL_min", #divers
+                    "Sunshine_sum", "Tot.Prcp_sum", "Snow_sum", "Radiation_sum") #divers
+
+mPCAmat=data.matrix(mPCA)
+mPCAcor<-cor(mPCAmat)
+corrplot(mPCAcor, type="upper", order="hclust", tl.col="black", tl.srt=45)
+
+```
+
+```{r fig.height=10, fig.width=10, echo=FALSE}
+d=cbind( meteoTrain$WS.10m_mean, meteoTrain$WS.80m_mean, meteoTrain$WS.900mb_mean, meteoTrain$WS.10m_max, meteoTrain$WS.80m_max,  meteoTrain$WS.900mb_max,meteoTrain$WS.10m_min, meteoTrain$WS.80m_min,  meteoTrain$WS.900mb_min)
+colnames(d) <- c("WS.10m_mean", "WS.80m_mean","WS.900mb_mean","WS.10m_max","WS.80m_max","WS.900mb_max","WS.10m_min","WS.80m_min","WS.900mb_min")
+pairs(d, pch ='.')
+
+#d2=cbind( meteoTrain$WS.10m_mean, meteoTrain$WS.80m_mean, meteoTrain$WS.900mb_mean, meteoTrain$WGust_mean)
+#colnames(d2)<- c("WS.10m_mean", "WS.80m_mean","WS.900mb_mean","WGust_mean")
+#pairs(d2, pch ='.',  col=meteoTrain$pluie.demain)
+```
+
+Peut être est-il intéressant de rechercher des corrélations au sein de certains groupes de variables et d'en éliminer certaines.
+Les variables de type vents sont plutôt très corrélées. En particulier WS.80m et WS10m Max et Mean
+Par la suite, lors de la selection de modèles on verra que ces variables de type vent-vitesse sont éliminées en grande partie. On n'en retient généralement 2 ou 3, voire une seule.
+
+
+## 4. Sélection de modèles - Choix de modèles (méthode exhaustive)
+
+Face à la grande quantité de variables explicatives, on cherche à les sélectionner de manière automatique.
+
+L'utilisation de la méthode regsubset du package leaps à partir du modèle saturé s'est montrée infructueuse.
+La convergence exacte des critères Cp /BIC/IC... est succpecte.
+Cette méthode et les modèles obtenus ne sont pas satifaisants.
+Y-a t'il trop de variables pour que la méthode regsubset soit significative?
+Ou bien est-ce cette méthode n'est pas adaptée aux modèles linéaire généralisés tel que logit.
+En effet on n'a étudié cette méthode, que dans le cadre des modèles linéaire gaussien.
+
+Comme alternative on va utiliser la méthode pas a pas: step du package MASS.
+Qui est basé sur une minimsation du critère AIC.
+On commence par la méthode progressive, puis descenadante et ascenadante à parir du modèle saturé.
+
+Dans un deuxième temps on utilisera à nouveaux ces méthodes mais à partir du modèle réduit issue de l'analyse PCA: m_PCA.
+En effet beaucoup de méthodes de sélection sont applicable à un nombre de variable réduit de l'ordre de 30 ou moins.
+On ne peut donc les utiliser à partir du modèle saturé à 44 variables.
+On essaiera aussi à partir de la fonction leaps d'utiliser les critères de R2aj et le Cp de Mallow.
+
+
+### 4.1 Méthodes step du package MASS à partir du modèle saturé
+On reprend le modèle saturé obtenu au §2: m_sature
+```{r  include= TRUE}
+m_sature = glm(formula = pluie.demain ~ (X+Year+Month+Day+
+    Temp_mean + Humidity_mean + MSL_mean + Tot.Prcp_sum + Snow_sum + 
+    Tot.CC_mean + CC.high_mean + CC.mid_mean + CC.low_mean + 
+    Sunshine_sum + Radiation_sum + WS.10m_mean + WDir.10m_mean + 
+    WS.80m_mean + WDir.80m_mean + WS.900mb_mean + WDir.900mb_mean + 
+    WGust_mean + Temp_max + Temp_min + Humidity_max + Humidity_min + 
+    MSL_max + MSL_min + Tot.CC_max + Tot.CC_min + CC.high_max + 
+    CC.high_min + CC.mid_max + CC.mid_min + CC.low_max + CC.low_min + 
+    WS.10m_max + WS.10m_min + WS.80m_max + WS.80m_min + WS.900mb_max + 
+    WS.900mb_min + WGust_max + WGust_min),  family = binomial(link="logit"),  data = meteoTrain)
+```
+#### 4.1.1 Méthode progressive - step backward-forward à partir de m_sature
+
+```{r eval=FALSE}
+library(MASS)
+modele_step_BwdFwd <- step(m_sature, data=meteoTrain, direction="both")
+```
+
+##### Modèle obtenu:
+```{r include=TRUE}
+m_StepBwdFwd<-glm(formula = pluie.demain ~ Temp_mean + Snow_sum + CC.low_mean + WS.80m_mean + 
+    WDir.900mb_mean + Temp_min + MSL_max + Tot.CC_max + Tot.CC_min + 
+    CC.high_max + CC.mid_max + CC.low_min + WS.10m_min + WGust_max + 
+    WS.900mb_max, family = binomial, data = meteoTrain)
+AIC(m_StepBwdFwd)
+```
+
+#### 4.1.2 Méthode descendante -  step backward à partir de m_sature
+
+```{r logit_step1, eval=FALSE}
+modele_step_Bwd <- step(m_sature, data=meteoTrain, direction="backward")
+```
+
+##### Modèle obtenu:
+```{r logit_step1Res1.0, include=TRUE, echo =TRUE}
+m_StepBwd<-glm(pluie.demain ~ Temp_mean + Snow_sum + CC.low_mean + WS.80m_mean + 
+    WDir.900mb_mean + Temp_min + MSL_max + MSL_min + Tot.CC_min + 
+    CC.high_max + CC.mid_max + CC.low_min + WS.10m_min + WGust_max,
+    data = meteoTrain, family = binomial)
+#summary(m_StepBwd)
+AIC(m_StepBwd)
+```
+
+#### 4.1.3 Méthode ascendante - step forward à partir de m_sature
+
+```{r eval=FALSE}
+step(glm(pluie.demain ~1,data=meteoTrain, family = binomial), pluie.demain ~ 
+        X+Year+Month+Day+ Temp_mean + Humidity_mean + MSL_mean + Tot.Prcp_sum + Snow_sum + 
+    Tot.CC_mean + CC.high_mean + CC.mid_mean + CC.low_mean + 
+    Sunshine_sum + Radiation_sum + WS.10m_mean + WDir.10m_mean + 
+    WS.80m_mean + WDir.80m_mean + WS.900mb_mean + WDir.900mb_mean + 
+    WGust_mean + Temp_max + Temp_min + Humidity_max + Humidity_min + 
+    MSL_max + MSL_min + Tot.CC_max + Tot.CC_min + CC.high_max + 
+    CC.high_min + CC.mid_max + CC.mid_min + CC.low_max + CC.low_min + 
+    WS.10m_max + WS.10m_min + WS.80m_max + WS.80m_min + WS.900mb_max + 
+    WS.900mb_min + WGust_max + WGust_min, 
+    data=meteoTrain, direction="forward")
+```
+
+##### Modèle obtenu:
+```{r include= TRUE}
+m_StepFwd<-glm(formula = pluie.demain ~ MSL_min + CC.mid_max + WDir.900mb_mean + 
+    CC.high_mean + Snow_sum + MSL_max + MSL_mean + WS.900mb_max + 
+    WS.80m_mean + WS.10m_min + WGust_max + Tot.CC_max, family = binomial, 
+    data = meteoTrain)
+#summary(m_StepFwd)
+AIC(m_StepFwd)
+```
+
+
+### 4.2 Méthodes step du package MASS à partir du modèle pré-sélectionné avec l'analyse PCA
+
+Reprenons le modèle PCA: m_PCA
+```{r include=TRUE}
+m_PCA<-glm(pluie.demain ~ 1 + 
+WGust_mean + WGust_max #1er axe
++ WS.10m_mean + WS.80m_mean + WS.900mb_mean #1er axe
++ WS.10m_max  + WS.80m_max  + WS.900mb_max #1er axe
++ Tot.CC_mean + Humidity_mean + Humidity_min  + #2eme axe 
++ WS.10m_min  + WS.80m_min + #2eme axe 
++ Temp_mean + Temp_max + Temp_min  + #3eme axe
++ WDir.80m_mean + WDir.10m_mean + WDir.900mb_mean + #4eme axe
++ Tot.CC_min + CC.low_min + CC.mid_min #5eme axe  
++ CC.mid_max + MSL_max + MSL_mean + MSL_min #divers
++ Sunshine_sum  + Tot.Prcp_sum + Snow_sum + Radiation_sum, #divers
+family = binomial,  data = meteoTrain )
+```
+
+#### 4.2.1 Méthode progressive - step backward-forward à partir de m_PCA
+
+```{r eval=FALSE}
+library(MASS)
+modele_step_BwdFwdPCA <- step(m_PCA, data=meteoTrain, direction="both")
+```
+
+##### Modèle obtenu:
+```{r include=TRUE}
+ m_StepBwdFwd_PCA<-glm(formula = pluie.demain ~ 1 + WGust_max + WS.80m_mean + WS.10m_min + Temp_mean + 
+    Temp_min + WDir.900mb_mean + Tot.CC_min + CC.low_min + CC.mid_max + 
+    MSL_max + MSL_mean + MSL_min + Sunshine_sum + Tot.Prcp_sum + Snow_sum,
+    family = binomial, data = meteoTrain)
+
+AIC(m_StepBwdFwd_PCA)
+BIC(m_StepBwdFwd_PCA)
+```
+
+
+#### 4.2.2 Méthode descendante - step backward à partir de m_PCA 
+
+```{r eval=FALSE}
+modele_step_BwdPCA <- step(m_PCA, data=meteoTrain, direction="backward")
+```
+
+##### Modèle obtenu:
+```{r logit_step1Res, include= TRUE}
+m_StepBwd_PCA<-glm(pluie.demain ~ WGust_max + WS.80m_mean + WS.10m_min + Temp_mean + 
+    Temp_min + WDir.900mb_mean + Tot.CC_min + CC.low_min + CC.mid_max + 
+    MSL_max + MSL_mean + MSL_min + Sunshine_sum + Tot.Prcp_sum + Snow_sum, data = meteoTrain, family = binomial)
+AIC(m_StepBwd_PCA)
+```
+On obtient le même modèle qu'avec la procédure progressive: m_StepBwd_PCA = m_StepBwdFwd_PCA
+
+#### 4.2.3 Méthode ascendante - step forward à partir de m_PCA
+
+```{r eval=FALSE}
+step(glm(pluie.demain ~1,data=meteoTrain, family = binomial),
+pluie.demain ~ 1 + 
+WGust_mean + WGust_max #1er axe
++ WS.10m_mean + WS.80m_mean + WS.900mb_mean #1er axe
++ WS.10m_max  + WS.80m_max  + WS.900mb_max #1er axe
++ Tot.CC_mean + Humidity_mean + Humidity_min  + #2eme axe 
++ WS.10m_min  + WS.80m_min + #2eme axe 
++ Temp_mean + Temp_max + Temp_min  + #3eme axe
++ WDir.80m_mean + WDir.10m_mean + WDir.900mb_mean + #4eme axe
++ Tot.CC_min + CC.low_min + CC.mid_min #5eme axe  
++ CC.mid_max + MSL_max + MSL_mean + MSL_min #divers
++ Sunshine_sum + Tot.Prcp_sum + Snow_sum + Radiation_sum, #divers 
+family = binomial,  data=meteoTrain, direction="forward")
+```
+
+##### Modèle obtenu:
+```{r logit_modeleStepFwdPCA.1, include= TRUE}
+m_StepFwd_PCA<-glm(formula = pluie.demain ~ MSL_min + CC.mid_max + WDir.900mb_mean + 
+    Snow_sum + CC.mid_min + MSL_max + MSL_mean + WS.900mb_max + 
+    WS.80m_mean + WS.10m_min + WGust_max + WDir.80m_mean, 
+    family = binomial, data = meteoTrain)
+AIC(m_StepFwd_PCA)
+```
+
+### 4.3 Autres méthodes: utilisation du package leaps 
+
+Pour réaliser cette sélection de variables on va utiliser la méthode leaps.
+Cette méthode n'est utilsable que pour au plus 31 variables.
+On est donc obligé de faire une première pré-selection.
+Pour celà on va partir des variables obtenues à partir de l'analyse PCA.
+Une alternative serait d'effectuer une pré-selection avec la méthode step (AIC) et poursuivre avec les autres critères.
+
+##### Préparation: 
+Chargement de la librairie leaps et tableau des numéro de colonnes
+```{r include=FALSE}
+#Indice des colonnes
+
+colnum <- which(names(meteoTrain) %in% c("WGust_mean","WGust_max", #1er axe
+"WS.10m_mean","WS.80m_mean", "WS.900mb_mean", #1er axe
+"WS.10m_max", "WS.80m_max",  "WS.900mb_max", #1er axe
+"Tot.CC_mean", "Humidity_mean", "Humidity_min", #2eme axe
+"WS.10m_min","WS.80m_min", #2eme axe
+"Temp_mean", "Temp_max", "Temp_min", #3eme axe
+"WDir.80m_mean", "WDir.10m_mean", "WDir.900mb_mean" , #4eme axe
+"Tot.CC_min", "CC.low_min", "CC.mid_min", #5eme axe 
+"CC.mid_max", "MSL_max", "MSL_mean", "MSL_min", #divers
+"Sunshine_sum", "Tot.Prcp_sum" , "Snow_sum", "Radiation_sum")) #divers
+
+#Tot.Prcp_mean
+
+col_rain <- 45
+require(leaps)
+```
+
+#### 4.3.1 Utilisation du R2Ajusté à partir de la méthode leaps
+
+```{r include=FALSE, echo =FALSE}
+choix.Raj = leaps(meteoTrain[,colnum],meteoTrain[,45],method="adjr2")
+class(choix.Raj)
+# choix.Raj est de class "list"
+names(choix.Raj)
+# Regarder les names et le type de choix.Raj
+best = which.max(choix.Raj$adjr2)
+best.mod = choix.Raj$which[best,]
+```
+
+```{r echo = FALSE}
+boxplot(choix.Raj$adjr2 ~choix.Raj$size,xlabel = "taille du modele",ylabel = "R2aj")
+points(choix.Raj$size[best]-1,choix.Raj$adjr2[best],pch=20,col=2,cex=1.5)
+title("Choix de modèle par le R2 ajusté à partir du modèle PCA")
+
+```
+Covariables retenues:
+```{r include=TRUE, echo =TRUE}
+print(names(meteoTrain)[colnum][best.mod])
+```
+
+##### Modèle obtenu:
+```{r include=TRUE}
+m_R2aj_PCA<-glm(pluie.demain ~ 
+   Temp_mean + MSL_mean + Tot.Prcp_sum + Snow_sum + Sunshine_sum + 
+   WDir.10m_mean + WS.80m_mean + WDir.80m_mean + WDir.900mb_mean +   
+   Temp_min  + MSL_max + MSL_min + Tot.CC_min + CC.mid_max + CC.low_min  +  
+   WS.10m_min + WS.900mb_max + WGust_max,  family = binomial,  data = meteoTrain )
+AIC(m_R2aj_PCA)
+```
+Le résultat du critère AIC est correcte.
+
+#### 4.3.2 Utilisation du Cp de Mallow à partir de la méthode leaps
+
+```{r include=FALSE, echo =FALSE}
+choix.CP = leaps(meteoTrain[,colnum],meteoTrain[,col_rain],method="Cp")
+best = which.min(choix.CP$Cp)
+best.mod = choix.CP$which[best,]
+```
+
+```{r include=TRUE, echo =FALSE}
+boxplot(choix.CP$Cp ~choix.CP$size,xlab = "taille du modele",ylab = 'Cp')
+points(choix.CP$size[best]-1,choix.CP$Cp[best],pch=20,col=2,cex=1.5)
+title("Choix de modèle par Cp de Mallows à partir du modèle PCA")
+```
+Covariables retenues:
+```{r include=TRUE, echo =FALSE}
+print(names(meteoTrain)[colnum][best.mod])
+```
+
+##### Modèle obtenu:
+```{r include=TRUE, echo =TRUE}
+m_Cp_PCA<-glm(pluie.demain ~ 
+ Temp_mean + MSL_mean + Tot.Prcp_sum + Sunshine_sum + WS.80m_mean +  WDir.900mb_mean
+ + Temp_min + MSL_max + MSL_min + Tot.CC_min + CC.mid_max + CC.low_min    
+ + WGust_max + WS.10m_min ,family = binomial,  data = meteoTrain )
+AIC(m_Cp_PCA)
+```
+
+#### 4.3.3 Tentative d'utilisation de regsubsets à partir du modèle réduit m_PCA
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+choix_modele<-regsubsets(pluie.demain ~ 1 + 
+WGust_mean + WGust_max #1er axe
++ WS.10m_mean + WS.80m_mean + WS.900mb_mean #1er axe
++ WS.10m_max  + WS.80m_max  + WS.900mb_max #1er axe
++ Tot.CC_mean + Humidity_mean + Humidity_min  + #2eme axe 
++ WS.10m_min  + WS.80m_min + #2eme axe 
++ Temp_mean + Temp_max + Temp_min  + #3eme axe
++ WDir.80m_mean + WDir.10m_mean + WDir.900mb_mean + #4eme axe
++ Tot.CC_min + CC.low_min + CC.mid_min #5eme axe  
++ CC.mid_max + MSL_max + MSL_mean + MSL_min #divers
++ Sunshine_sum + Tot.Prcp_sum + Snow_sum + Radiation_sum, #divers
+int=T, nbest=1,nvmax=4,method="exhaustive",data=meteoTrain)
+#summary(choix_modele)
+```
+Là encore le résultat n'est pas satisfaisant.
+```{r echo=FALSE, fig.height=5, fig.width=9}
+#par(mfrow=c(1,1))
+plot(choix_modele,scale="r2", main="Choix de modèle - critère R2", cex.axis=0.7)
+plot(choix_modele,scale="adjr2", main="Choix de modèle - critère R2 ajusté", cex.axis=0.7)
+plot(choix_modele,scale="Cp", main="Choix de modèle - critère Cp de Mallows", cex.axis=0.7)
+plot(choix_modele,scale="bic", main="Choix de modèle - critère BIC", cex.axis=0.7)
+```
+
+
+### 4.4 Autres procédures automatiques adaptées aux modèles glm
+
+#### 4.4.1 Le package bestglm
+Apparamment limité à 15 variables explicatives.
+La solution serait de réduire le nombre de variables à 15 par la méthode step.
+Puis d'utiliser la méthode bestglm.
+
+http://www2.uaem.mx/r-mirror/web/packages/bestglm/vignettes/bestglm.pdf
+
+```{r logit_BESTGLM1.0, echo=FALSE}
+#install.packages("bestglm")
+library(bestglm)
+#Best subset using AIC
+#bestglm(meteoTrain, IC="BIC",  family=binomial)
+```
+
+#### 4.4.2 Les packages glmnet et BeSS
+Sortent du cadre du cours.
+
+#### 4.4.3 Le package glmulti
+Limité a 32 variables explicatives.
+On va pouvoir l'utiliser à partir des variables préselectionnées lors de l'analyse PCA.
+Le code est désactivé (en commentaire) car la méthode est très coûteuse en temps.
+
+```{r logit_MULTI1.0, eval=FALSE, include=FALSE}
+#Sys.setenv(JAVA_HOME='C:\\Program Files\\Java\\jre1.8.0_221')
+# require(glmulti)
+# 
+# colnum <- which(names(meteoTrain) %in% c("WGust_mean","WGust_max", #1er axe
+# "WS.10m_mean","WS.80m_mean", "WS.900mb_mean", #1er axe
+# # "WS.10m_max", "WS.80m_max",  "WS.900mb_max", #1er axe
+# "Tot.CC_mean", "Humidity_mean", "Humidity_min", #2eme axe
+# "WS.10m_min","WS.80m_min", #2eme axe
+# "Temp_mean", "Temp_max", "Temp_min", #3eme axe
+# "WDir.80m_mean", "WDir.10m_mean", "WDir.900mb_mean" , #4eme axe
+# "Tot.CC_min", "CC.low_min", "CC.mid_min", #5eme axe 
+# "MSL_max", "MSL_min",  #divers , "MSL_mean"
+# "Sunshine_sum", "CC.mid_max",
+# "Tot.Prcp_sum" , "Snow_sum")) 
+# #, "Radiation_sum")) #divers
+
+# glmulti.logit.out <- glmulti(meteoTrain$pluie.demain ~ meteoTrain$WGust_mean + meteoTrain$WGust_max + #1er axe
+#    meteoTrain$WS.10m_mean + meteoTrain$WS.80m_mean + meteoTrain$WS.900mb_mean + #1er axe
+#    #meteoTrain$WS.10m_max  + meteoTrain$WS.80m_max + meteoTrain$WS.900mb_max + #1er axe
+#    meteoTrain$Tot.CC_mean + meteoTrain$Humidity_mean + meteoTrain$Humidity_min + #2eme axe  #spression multi_PCA1
+#    meteoTrain$WS.10m_min  + meteoTrain$WS.80m_min + #2eme axe
+#    meteoTrain$Temp_mean + meteoTrain$Temp_max + meteoTrain$Temp_min + #3eme axe
+#    meteoTrain$WDir.80m_mean + meteoTrain$WDir.10m_mean + meteoTrain$WDir.900mb_mean +  #4eme axe
+#    meteoTrain$Tot.CC_min + meteoTrain$CC.low_min + meteoTrain$CC.mid_min  + #5eme axe
+#    meteoTrain$MSL_max + meteoTrain$MSL_min + #meteoTrain$MSL_mean +  #spression multi_PCA1 #supp variables
+#    meteoTrain$Sunshine_sum + meteoTrain$CC.mid_max + #supp variable
+#    meteoTrain$Tot.Prcp_sum + meteoTrain$Snow_sum, #+ Radiation_sum
+#            data = meteoTrain[,colnum],
+#            chunk = 2, chunks = 3,
+#            level = 1,               # No interaction considered
+#            method = "h",            # Exhaustive approach
+#            crit = "aic",            # AIC as criteria
+#            confsetsize = 5,         # Keep 5 best models
+#            plotty = F, report = T,  # No plot or interim reports
+#            fitfunction = "glm",     # glm function
+#            family = binomial)     # binomial family for logistic regression
+
+#glmulti.lm.out@formulas
+## Show 5 best models (Use @ instead of $ for an S4 object)
+#glmulti.logit.out@formulas
+## Show result for the best model
+#summary(glmulti.logit.out@objects[[1]])
+
+#system.time(sapply(seuil, cout))
+#system.time(parSapply(cl, seuil, cout))
+
+#After 776400 models:Best model: 
+#m_glmulti_PCA = glm(formula = pluie.demain ~ 
+#                      WS.10m_mean+WS.80m_mean+WGust_max+WS.900mb_max+Tot.CC_mean+Temp_mean+Temp_min+
+#                      WDir.80m_mean+WDir.900mb_mean+MSL_max+MSL_min, family = binomial,data = meteoTrain)
+
+```
+
+Le coût en temps étant vraiment trop important, il a fallut éliminer encore des variables.
+Les modèles obtenus ont un moins bon AIC que nos autres modèles.
+
+##### Modèles obtenus à partir du package glmulti:
+
+```{r logit_MULTI1Res.0, include=TRUE}
+
+m_glmulti_PCA1<-glm(formula = pluie.demain~
+    WS.80m_mean + WS.900mb_max + WGust_max + 
+    Temp_mean + Temp_min + 
+    WDir.900mb_mean + 
+    MSL_max + 
+    Tot.CC_mean + CC.mid_max + Tot.CC_min + CC.low_min, family = binomial, 
+    data = meteoTrain)
+AIC(m_glmulti_PCA1)
+BIC(m_glmulti_PCA1)
+
+m_glmulti_PCA2<-glm(formula = pluie.demain~
+    WS.10m_mean + WS.80m_mean + WGust_max + 
+    Temp_mean + Temp_min + 
+    WDir.80m_mean + WDir.10m_mean + WDir.900mb_mean + 
+    MSL_max + MSL_min + Sunshine_sum + 
+    CC.mid_max + Tot.CC_min + CC.low_min, family = binomial, 
+    data = meteoTrain)
+AIC(m_glmulti_PCA2)
+BIC(m_glmulti_PCA2)
+
+m_glmulti_PCA3<-glm(formula = pluie.demain~
+    WS.10m_mean + WS.80m_mean + WS.900mb_max  + 
+    Temp_mean + Temp_min + 
+    WDir.900mb_mean + 
+    MSL_max + 
+    Tot.CC_mean + CC.mid_max + Tot.CC_min + CC.low_min, family = binomial, 
+    data = meteoTrain)
+AIC(m_glmulti_PCA3)
+BIC(m_glmulti_PCA3)
+```
+
+Vraissemblablement la préselection s'est révélée trop restrictive.
+On ne va donc pas garder ces modèles.
+
+### 4.5 Résumé des caractéristiques des modèles retenus
+
+#### 4.5.1 Les modèles obtenus à partir du modèle saturé
+##### Le modèle saturé ou complet
+
+```{r m_sature01-resum, include= TRUE}
+#Modèle saturé
+m_sature<-glm(formula = pluie.demain ~ (X+Year+Month+Day+
+    Temp_mean + Humidity_mean + MSL_mean + Tot.Prcp_sum + Snow_sum + 
+    Tot.CC_mean + CC.high_mean + CC.mid_mean + CC.low_mean + 
+    Sunshine_sum + Radiation_sum + WS.10m_mean + WDir.10m_mean + 
+    WS.80m_mean + WDir.80m_mean + WS.900mb_mean + WDir.900mb_mean + 
+    WGust_mean + Temp_max + Temp_min + Humidity_max + Humidity_min + 
+    MSL_max + MSL_min + Tot.CC_max + Tot.CC_min + CC.high_max + 
+    CC.high_min + CC.mid_max + CC.mid_min + CC.low_max + CC.low_min + 
+    WS.10m_max + WS.10m_min + WS.80m_max + WS.80m_min + WS.900mb_max + 
+    WS.900mb_min + WGust_max + WGust_min),  family = binomial,  data = meteoTrain)
+summary(m_sature)
+```
+
+##### Les 3 modèles obtenus par minimsation du critère AIC de la méthode step - (Both, Backward et Forward)
+(A patir du modèle saturé m_sature)
+
+```{r include=TRUE}
+#Modèle step backward/forward: m_StepBwdFwd à partir de m_sature
+m_StepBwdFwd<-glm(formula = pluie.demain ~ Temp_mean + Snow_sum + CC.low_mean + WS.80m_mean + 
+    WDir.900mb_mean + Temp_min + MSL_max + Tot.CC_max + Tot.CC_min + 
+    CC.high_max + CC.mid_max + CC.low_min + WS.10m_min + WGust_max + 
+    WS.900mb_max, family = binomial, data = meteoTrain)
+summary(m_StepBwdFwd)
+
+#Modèle step backward: m_StepBwd à partir de m_sature
+m_StepBwd<-glm(pluie.demain ~ Temp_mean + Snow_sum + CC.low_mean + WS.80m_mean + 
+    WDir.900mb_mean + Temp_min + MSL_max + MSL_min + Tot.CC_min + 
+    CC.high_max + CC.mid_max + CC.low_min + WS.10m_min + WGust_max,
+    data = meteoTrain, family = binomial)
+summary(m_StepBwd)
+
+#Modèle step forward: m_StepFwd à partir de m_sature
+m_StepFwd<-glm(formula = pluie.demain ~ MSL_min + CC.mid_max + WDir.900mb_mean + 
+    CC.high_mean + Snow_sum + MSL_max + MSL_mean + WS.900mb_max + 
+    WS.80m_mean + WS.10m_min + WGust_max + Tot.CC_max, family = binomial, 
+    data = meteoTrain)
+summary(m_StepFwd)
+```
+
+Comparaison avec le modèle "saturé" d'origine:
+```{r eval=FALSE}
+anova(m_sature,m_StepBwdFwd,test="LRT")
+anova(m_sature,m_StepBwd,test="LRT")
+anova(m_sature,m_StepFwd,test="LRT")
+```
+Pour les 2 modèles m_StepBwdFwd, m_StepBwd: on rejette de manière très nette l'hypothèse H0.
+Et on accepte la nullité des paramètres du modèle : m_sature qui ne sont pas dans les modèles step. 
+On préfèrera donc m_StepBwdFwd, m_StepBwd.
+Par contre pour le modèle m_StepFwd le test n'est pas significatif. En effet au seuil de 6% on préfèrera le modèle saturé.
+
+#### 4.5.2 Les modèles obtenus à partir de l'analyse PCA
+##### Le modèle issue de l'analyse PCA
+
+```{r m_PCA2-resum, include= TRUE}
+# Modèle obtenue avec l'analyse PCA - Avec l'option quali.sup=[1:4]
+m_PCA<-glm(pluie.demain ~ 1 + 
+WGust_mean + WGust_max #1er axe
++ WS.10m_mean + WS.80m_mean + WS.900mb_mean #1er axe
++ WS.10m_max  + WS.80m_max  + WS.900mb_max #1er axe
++ Tot.CC_mean + Humidity_mean + Humidity_min  + #2eme axe 
++ WS.10m_min  + WS.80m_min + #2eme axe 
++ Temp_mean + Temp_max + Temp_min  + #3eme axe
++ WDir.80m_mean + WDir.10m_mean + WDir.900mb_mean + #4eme axe
++ Tot.CC_min + CC.low_min + CC.mid_min #5eme axe  
++ CC.mid_max + MSL_max + MSL_mean + MSL_min #divers
++ Sunshine_sum  + Tot.Prcp_sum + Snow_sum + Radiation_sum, #divers
+family = binomial,  data = meteoTrain )
+summary(m_PCA)
+```
+
+##### Les 2 modèles obtenus par minimsation du critère AIC de la méthode step à partir de m_PCA
+(m_StepBwdFwd_PCA et m_StepBwd_PCA sont identiques)
+
+```{r include=TRUE}
+#Modèle step backward/forward: m_StepBwdFwd_PCA à partir de m_PCA
+m_StepBwdFwd_PCA<-glm(formula = pluie.demain ~ 1 + WGust_max + WS.80m_mean + WS.10m_min + Temp_mean + 
+    Temp_min + WDir.900mb_mean + Tot.CC_min + CC.low_min + CC.mid_max + 
+    MSL_max + MSL_mean + MSL_min + Sunshine_sum + Tot.Prcp_sum + Snow_sum,
+    family = binomial, data = meteoTrain)
+summary(m_StepBwdFwd_PCA)
+
+#Modèle step forward: m_StepFwd_PCA à partir de m_PCA
+m_StepFwd_PCA<-glm(formula = pluie.demain ~ MSL_min + CC.mid_max + WDir.900mb_mean + 
+    Snow_sum + CC.mid_min + MSL_max + MSL_mean + WS.900mb_max + 
+    WS.80m_mean + WS.10m_min + WGust_max + WDir.80m_mean, 
+    family = binomial, data = meteoTrain)
+summary(m_StepFwd_PCA)
+```
+
+Comparaison avec le modèle "saturé":
+```{r eval=FALSE}
+anova(m_sature,m_StepBwdFwd_PCA,test="LRT")
+anova(m_sature,m_StepFwd_PCA,test="LRT")
+```
+On conservera m_StepBwdFwd_PCA. Mais ce n'est pas le cas pour m_StepFwd_PCA.
+
+Comparaison avec le modèle "PCA":
+```{r eval=FALSE}
+anova(m_PCA,m_StepBwdFwd_PCA,test="LRT")
+anova(m_PCA,m_StepFwd_PCA,test="LRT")
+```
+Là encore m_StepBwdFwd_PCA est meilleur que m_PCA mais ce n'est pas le cas de m_StepFwd_PCA.
+On va donc éliminer m_StepFwd_PCA
+
+
+##### Les 2 modèles obtenus à partir de la méthode leaps par minimsation du critère R2 ajusté puis Cp de Mallows
+(obtenue à partir de la préselection par PCA)
+m_StepBwdFwd_PCA et m_Cp_PCA sont identiques on a donc éliminé m_Cp_PCA: Cp de Mallows
+
+```{r include=TRUE}
+#Modèle leaps critère R2 ajusté: m_R2aj_PCA à partir de m_PCA
+m_R2aj_PCA<-glm(pluie.demain ~ 
+   Temp_mean + MSL_mean + Tot.Prcp_sum + Snow_sum + Sunshine_sum + 
+   WDir.10m_mean + WS.80m_mean + WDir.80m_mean + WDir.900mb_mean +   
+   Temp_min  + MSL_max + MSL_min + Tot.CC_min + CC.mid_max + CC.low_min  +  
+   WS.10m_min + WS.900mb_max + WGust_max,  family = binomial,  data = meteoTrain )
+summary(m_R2aj_PCA)
+
+#Modèle leaps critère Cp Mallows: m_Cp_PCA à partir de m_PCA identique à m_StepBwdFwd_PCA
+m_Cp_PCA<-glm(pluie.demain ~ 
+ Temp_mean + MSL_mean + Tot.Prcp_sum + Sunshine_sum + WS.80m_mean +  WDir.900mb_mean
+ + Temp_min + MSL_max + MSL_min + Tot.CC_min + CC.mid_max + CC.low_min    
+ + WGust_max + WS.10m_min ,family = binomial,  data = meteoTrain )
+ summary(m_Cp_PCA)
+```
+
+Comparaison avec le modèle "saturé" d'origine:
+```{r eval=FALSE}
+anova(m_sature,m_R2aj_PCA,test="LRT")
+anova(m_PCA,m_R2aj_PCA,test="LRT")
+anova(m_sature,m_Cp_PCA,test="LRT")
+anova(m_PCA,m_Cp_PCA,test="LRT")
+```
+On préfèrera la aussi m_R2aj_PCA et m_Cp_PCA au modèle saturé: m_sature
+On conserve le modèle m_R2aj_PCA et m_Cp_PCA.
+
+#### 4.5.3 Comparaison des différents modèles avec les critères BIC et AIC
+
+Tous ces modèles ont un meilleur BIC et AIC que le modèle saturé.
+A la vue des critères BIC et AIC les modèles (hors modèles initiaux: saturé et PCA) semblent très proches.
+Excepté pour le modèle : m_StepFwd qui est en retrait par rapport aux autres.
+
+Modèle		        | AIC		    |  BIC
+----------------- | --------- | -----------
+m_sature 	        | 1431.849	|    1662.378
+m_StepBwdFwd	    | 1392.372	|    1474.338
+m_StepBwd	        | 1393.164	|    1470.007
+m_StepFwd	        | 1413.588	|    1480.185
+m_PCA		          | 1416.738	|    1575.547
+m_StepBwdFwd_PCA  | 1394.18	  |    1476.146
+m_R2aj_PCA	      | 1396.347	|    1493.681
+m_Cp_PCA	        | 1396.679	|    1473.522
+
+```{r logit_AIC3, include=FALSE}
+AIC(m_sature)
+AIC(m_StepBwdFwd)
+AIC(m_StepBwd)
+AIC(m_StepFwd)
+AIC(m_PCA)
+AIC(m_StepBwdFwd_PCA)
+AIC(m_R2aj_PCA)
+AIC(m_Cp_PCA)
+```
+
+```{r logit_BIC3, include=FALSE}
+BIC(m_sature)
+BIC(m_StepBwdFwd)
+BIC(m_StepBwd)
+BIC(m_StepFwd)
+BIC(m_PCA)
+BIC(m_StepBwdFwd_PCA)
+BIC(m_R2aj_PCA)
+BIC(m_Cp_PCA)
+```
+
+On va essayer de les départager en utilsant la validation croisée.
+
+## 5. Validation croisé - Performance des modèles
+Nos données de test sont incomplètes, il manque le résultat pluie.demain. On ne peut donc pas effectuer une validation croisée  àpartir de ces données.
+Pour mener à bien cette comparaison il faut séparer (à nouveaux) les données d’entrainement (meteoTrain) en 2 jeux de données : dataTest et dataTrain. 
+Puis recalibrer les modèles obtenus à partir du nouveau jeux de données: dataTrain. Et effectuer les tests sur le jeux dataTest. 
+Ceci n’est qu’une approximation et donc à considérer avec retenue. 
+En effet les nouvelles données d’entrainement seraient succeptibles de produire de nouveaux modèles.
+
+### 5.0 Initialisation
+On doit recharger tous les modèles pour les calibrer avec les nouvelles données.
+On effectue la prédiction pour chacun des modèles, à partir de la fonction : predict appliquée aux données de tests (dataTest)
+Avec l'option : type="reponse" pour bien avoir la probabilité de prédiction.
+
+```{r LOAD_models, include=FALSE}
+
+train = sample(c(T, F), nrow(meteoTrain), replace = T, prob = c(.80, .20))
+dataTrain<-meteoTrain[train,]
+dataTest<-meteoTrain[!train,]
+
+#Modèle saturé
+mt_sature<-glm(formula = pluie.demain ~ (X+Year+Month+Day+
+    Temp_mean + Humidity_mean + MSL_mean + Tot.Prcp_sum + Snow_sum + 
+    Tot.CC_mean + CC.high_mean + CC.mid_mean + CC.low_mean + 
+    Sunshine_sum + Radiation_sum + WS.10m_mean + WDir.10m_mean + 
+    WS.80m_mean + WDir.80m_mean + WS.900mb_mean + WDir.900mb_mean + 
+    WGust_mean + Temp_max + Temp_min + Humidity_max + Humidity_min + 
+    MSL_max + MSL_min + Tot.CC_max + Tot.CC_min + CC.high_max + 
+    CC.high_min + CC.mid_max + CC.mid_min + CC.low_max + CC.low_min + 
+    WS.10m_max + WS.10m_min + WS.80m_max + WS.80m_min + WS.900mb_max + 
+    WS.900mb_min + WGust_max + WGust_min),  family = binomial,  data = dataTrain)
+    
+#Modèle step backward/forward: m_StepBwdFwd à partir de m_sature
+mt_StepBwdFwd = glm(formula = pluie.demain ~ Temp_mean + Snow_sum + CC.low_mean + WS.80m_mean + 
+    WDir.900mb_mean + Temp_min + MSL_max + Tot.CC_max + Tot.CC_min + 
+    CC.high_max + CC.mid_max + CC.low_min + WS.10m_min + WGust_max + 
+    WS.900mb_max, family = binomial, data = dataTrain)
+
+#Modèle step backward: m_StepBwd à partir de m_sature
+mt_StepBwd<-glm(pluie.demain ~ Temp_mean + Snow_sum + CC.low_mean + WS.80m_mean + 
+    WDir.900mb_mean + Temp_min + MSL_max + MSL_min + Tot.CC_min + 
+    CC.high_max + CC.mid_max + CC.low_min + WS.10m_min + WGust_max,
+    data = dataTrain, family = binomial)
+
+#Modèle step forward: m_StepFwd à partir de m_sature
+mt_StepFwd<-glm(formula = pluie.demain ~ MSL_min + CC.mid_max + WDir.900mb_mean + 
+    CC.high_mean + Snow_sum + MSL_max + MSL_mean + WS.900mb_max + 
+    WS.80m_mean + WS.10m_min + WGust_max + Tot.CC_max, family = binomial, 
+    data = dataTrain)
+    
+#Modèle issue de l'analyse PCA
+mt_PCA <- glm(pluie.demain ~ 1 + 
+WGust_mean + WGust_max #1er axe
++ WS.10m_mean + WS.80m_mean + WS.900mb_mean #1er axe
++ WS.10m_max  + WS.80m_max  + WS.900mb_max #1er axe
++ Tot.CC_mean + Humidity_mean + Humidity_min  + #2eme axe 
++ WS.10m_min  + WS.80m_min + #2eme axe 
++ Temp_mean + Temp_max + Temp_min  + #3eme axe
++ WDir.80m_mean + WDir.10m_mean + WDir.900mb_mean + #4eme axe
++ Tot.CC_min + CC.low_min + CC.mid_min #5eme axe  
++ CC.mid_max + MSL_max + MSL_mean + MSL_min #divers
++ Sunshine_sum  + Tot.Prcp_sum + Snow_sum + Radiation_sum, #divers
+family = binomial,  data = dataTrain )
+
+#Modèle step backward/forward: m_StepBwdFwd_PCA à partir de m_PCA
+mt_StepBwdFwd_PCA<-glm(formula = pluie.demain ~ 1 + WGust_max + WS.80m_mean + WS.10m_min + Temp_mean + 
+    Temp_min + WDir.900mb_mean + Tot.CC_min + CC.low_min + CC.mid_max + 
+    MSL_max + MSL_mean + MSL_min + Sunshine_sum + Tot.Prcp_sum + Snow_sum,
+    family = binomial, data = dataTrain)
+
+#Modèle step forward: m_StepFwd_PCA à partir de m_PCA
+mt_StepFwd_PCA = glm(formula = pluie.demain ~ MSL_min + CC.mid_max + WDir.900mb_mean + 
+    Snow_sum + CC.mid_min + MSL_max + MSL_mean + WS.900mb_max + 
+    WS.80m_mean + WS.10m_min + WGust_max + WDir.80m_mean, 
+    family = binomial, data = dataTrain)
+
+#Modèle leaps critère R2 ajusté: m_R2aj_PCA à partir de m_PCA
+mt_R2aj_PCA<-glm(pluie.demain ~ 
+   Temp_mean + MSL_mean + Tot.Prcp_sum + Snow_sum + Sunshine_sum + 
+   WDir.10m_mean + WS.80m_mean + WDir.80m_mean + WDir.900mb_mean +   
+   Temp_min  + MSL_max + MSL_min + Tot.CC_min + CC.mid_max + CC.low_min  +  
+   WS.10m_min + WS.900mb_max + WGust_max,  family = binomial,  data = dataTrain )
+
+#Modèle leaps critère Cp de Mallows: v à partir de m_PCA
+mt_Cp_PCA<-glm(pluie.demain ~ 
+ Temp_mean + MSL_mean + Tot.Prcp_sum + Sunshine_sum + WS.80m_mean +  WDir.900mb_mean
+ + Temp_min + MSL_max + MSL_min + Tot.CC_min + CC.mid_max + CC.low_min    
+ + WGust_max + WS.10m_min ,family = binomial,  data = dataTrain )
+
+#Modèles issue du package glmulti
+mt_glmulti_PCA1<-glm(formula =pluie.demain~
+    WS.80m_mean + WS.900mb_max + WGust_max + 
+    Temp_mean + Temp_min + 
+    WDir.900mb_mean + 
+    MSL_max + 
+    Tot.CC_mean + CC.mid_max + Tot.CC_min + CC.low_min, family = binomial, 
+    data = dataTrain)
+
+mt_glmulti_PCA2<-glm(formula = pluie.demain~
+    WS.10m_mean + WS.80m_mean + WGust_max + 
+    Temp_mean + Temp_min + 
+    WDir.80m_mean + WDir.10m_mean + WDir.900mb_mean + 
+    MSL_max + MSL_min + Sunshine_sum + 
+    CC.mid_max + Tot.CC_min + CC.low_min, family = binomial, 
+    data = dataTrain)
+
+mt_glmulti_PCA3<-glm(formula = pluie.demain~
+    WS.10m_mean + WS.80m_mean + WS.900mb_max  + 
+    Temp_mean + Temp_min + 
+    WDir.900mb_mean + 
+    MSL_max + 
+    Tot.CC_mean + CC.mid_max + Tot.CC_min + CC.low_min, family = binomial, 
+    data = dataTrain)
+
+#Option type = "response" gives the predicted probabilities - by default: probabilities on logit scale.
+prev_mt_StepBwdFwd <- predict(mt_StepBwdFwd,newdata = dataTest, type = "response" )
+prev_mt_StepBwdFwd_PCA <- predict(mt_StepBwdFwd_PCA,newdata = dataTest, type = "response" )
+prev_mt_StepBwd <- predict(mt_StepBwd,newdata = dataTest, type = "response" )
+prev_mt_StepFwd <- predict(mt_StepFwd,newdata = dataTest, type = "response" )
+#prev_mt_StepFwd_PCA <- predict(mt_StepFwd_PCA,newdata = dataTest, type = "response" )
+prev_mt_R2aj_PCA <- predict(mt_R2aj_PCA,newdata = dataTest, type = "response" )
+prev_mt_Cp_PCA <- predict(mt_Cp_PCA,newdata = dataTest, type = "response" )
+prev_mt_sature <- predict(mt_sature,newdata = dataTest, type = "response" )
+prev_mt_PCA <- predict(mt_PCA,newdata = dataTest, type = "response" )
+prev_mt_glmulti3 <- predict(mt_glmulti_PCA3,newdata = dataTest, type = "response" )
+prev_mt_glmulti1 <- predict(mt_glmulti_PCA1,newdata = dataTest, type = "response" )
+prev_mt_glmulti2 <- predict(mt_glmulti_PCA2,newdata = dataTest, type = "response" )
+
+```
+
+### 5.1 Probabilité estimée d'avoir pluie.demain=TRUE
+```{r fig.height=5, fig.width=10, echo=FALSE}
+ 
+ pred_proba <- data.frame(Sature = prev_mt_sature,
+                         StepBwdFwd = prev_mt_StepBwdFwd,
+                         StepBwd = prev_mt_StepBwd,
+                         StepFwd = prev_mt_StepFwd,
+                         PCA = prev_mt_PCA,
+                         StepBwdFwd_PCA = prev_mt_StepBwdFwd_PCA,
+                         #StepFwd_PCA = prev_mt_StepFwd_PCA,
+                         R2aj_PCA = prev_mt_R2aj_PCA,
+                         Cp_PCA = prev_mt_Cp_PCA)
+                         #glmulti3 = prev_mt_glmulti3,
+                         #glmulti1 = prev_mt_glmulti1,
+                         #glmulti2 = prev_mt_glmulti2)
+head(round(pred_proba,3),n=7)
+```
+
+### 5.2 Estimation au seuil de 0.5
+On confronte les probabilités obtenues en 5.1 aux seuil de 0.5
+Dés que la prévision dépasse 50% on prédit qu'il pleuvra demain.
+```{r fig.height=7, fig.width=10, include=TRUE, paged.print=TRUE}
+ pred_0.5 <- apply(pred_proba >=0.5, 2, factor,labels=c("FALSE","TRUE"))
+ head(pred_0.5,n=7)
+```
+
+
+```{r include=FALSE}
+### Evaluation de la moyenne de prédiction l'erreur de prédiction
+
+mean(abs(prev_mt_StepBwdFwd - 1), na.rm = T)
+mean(abs(prev_mt_StepBwdFwd_PCA - 1), na.rm = T)
+
+#?predict
+mean(abs(prev_mt_StepBwdFwd-!dataTest[, "pluie.demain"]), na.rm = T)
+mean(abs(prev_mt_StepBwdFwd_PCA-!dataTest[, "pluie.demain"]), na.rm = T)
+
+```
+
+### 5.3 Pourcentage de réussite des modèles par rapport à l'observation
+On compare maintenant les valeurs prédites aux valeurs observées.
+On fait mieux que la moyenne, par contre on a très peu gagné par rapport au modèle saturé, entre 1% et 2%.
+La méthode employée s'est révélée assez peu performante.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+ library(tidyverse)
+ compare_PredObs <- data.frame(pred_0.5)
+ compare_PredObs <- compare_PredObs %>% mutate(Observe=dataTest$pluie.demain) 
+res<- compare_PredObs %>% summarise_all(funs( 100*mean(Observe==.))) %>% round(4)
+head(res)
+```
+
+### 5.4 Courbes ROC
+
+Le meilleur estiamteur aura une aire sous la courbe le plus proche possible de 1.
+La courbe idéale serait perpendiculaire aux abscisse du point origine jusqu'au point (0.1) puis prallèle jusqu'au point (1,1)
+Si bien que l'aire sous cette courbe serait égale à 1.
+
+```{r echo=TRUE, fig.height=5, fig.width=7, message=FALSE, warning=FALSE, echo=FALSE}
+#install.packages("plotROC")
+require(plotROC)
+df_roc <- pred_proba %>% mutate(obs = dataTest$pluie.demain) %>%
+  gather(key = methode, value = score, Sature,StepBwdFwd,StepBwdFwd_PCA,StepFwd)
+ ggplot(df_roc) + aes(d=obs,m=score,color=methode) + geom_roc()+theme_classic()
+```
+
+```{r echo=TRUE, fig.height=5, fig.width=7, message=FALSE, warning=FALSE, echo=FALSE}
+#install.packages("plotROC")
+require(plotROC)
+df_roc <- pred_proba %>% mutate(obs = dataTest$pluie.demain) %>%
+  gather(key = methode, value = score, Sature, PCA,StepBwdFwd_PCA,R2aj_PCA,Cp_PCA)
+ ggplot(df_roc) + aes(d=obs,m=score,color=methode) + geom_roc()+theme_classic()
+```
+
+## 6. Choix et validation du modèle
+
+Le modèle retenu est le modèle: m_StepBwdFwd. 
+Obtenu à partir du modèle complet (m_sature) par méthode pas à pas progessive en utilsant la fonction step du package MASS qui minimise le critère AIC.
+De tous nos modèles c'est celui qui a le plus peit AIC. Et l'un des critère BIC les plus faible.
+La validation croisé est assez satisfaisante, avec un taux de succès de l'ordre de 70%.
+Mais la grande majorité des modèles construits sont très proches et il est difficile de les départager.
+Il faudrait pouvoir réaliser une véritable validation croisée et utiliser différentes estimation de l'écart aux données observées (Normes L1, L2..).
+
+
+### 6.1 Corrélations entre variables explicatives
+On remarque qu'un nombre important de variable est peu corrélée. Ce qui est une très bonne chose.
+L'information apportées par les vqriables du modèle est bien complémentaire.
+
+```{r fig.height=15, fig.width=15, echo=FALSE}
+
+dataStepBkwFwd=cbind( meteoTrain$Temp_mean, meteoTrain$Temp_min, meteoTrain$Snow_sum, meteoTrain$MSL_max, meteoTrain$CC.low_mean,  meteoTrain$Tot.CC_max,meteoTrain$Tot.CC_min, meteoTrain$CC.high_max,  meteoTrain$CC.mid_max,
+ meteoTrain$CC.low_min,meteoTrain$WS.80m_mean, meteoTrain$WDir.900mb_mean,  meteoTrain$WS.900mb_max,   
+  meteoTrain$WS.10m_min,  meteoTrain$WGust_max)
+colnames(dataStepBkwFwd) <- c("Temp_mean", "Temp_min","Snow_sum",
+                 "MSL_max","CC.low_mean",  "Tot.CC_max","Tot.CC_min", "CC.high_max", "CC.mid_max","CC.low_min",
+                 "WS.80m_mean","WDir.900mb_mean","WS.900mb_max", "WS.10m_min","WGust_max")
+my_cols <- c("#00AFBB", "#E7B800")
+pairs(dataStepBkwFwd, pch ='.', my_cols[meteoTrain$pluie.demain])
+
+```
+
+```{r fig.height=10, fig.width=10, echo=FALSE}
+StepBkwFwd_mat=data.matrix(dataStepBkwFwd)
+StepBkwFwdcor<-cor(StepBkwFwd_mat)
+corrplot(StepBkwFwdcor, type="upper", order="hclust", tl.col="black", tl.srt=45)
+```
+Par contre nos graphiques ne permettent pas de détecter la multicollinéarité.
+Pour celà on peut utiliser la fonction VIF (variance inflation factors) du package Faraway: VIF = 1/(1−R2) 
+Plus le VIF est grand, plus la variable est corrélée avec les autres. 
+VIF ∈ [1, +∞[
+
+```{r message=FALSE, warning=FALSE}
+require(faraway)
+vif(m_StepBwdFwd)
+```
+Problème de colinéarité entre les variables Temp_mean et Temp_min.
+Le résultat générale semble assez moyen.
+L'utilisation du R2, et donc de la fonction VIF elle même est possiblement mal adapté au modèles glm.
+
+### 6.2 Résidus et résidus partiels
+Tous les résultats sont basés sur des hypothèses fondamentales liés au terme d’erreur qui résume les informations absentes du modèle.
+Hypothèses liées au terme d’erreur :
+
+- Les erreurs sont centrées E(erreur) = 0.
+- La distribution est gaussienne
+- La variance est constante (σ2)
+- Les erreurs (Erreur_i)1≤i≤n sont indépendantes.
+
+Pour vérifier ces hypothèses on va regarder des graphiques des résidus qui sont des approximations de ces erreurs.
+
+- L’hypothèse d’indépendance est considérée comme vérifiée lorsque chaque donnée correspond à un échantillonnage indépendant ou à une expérience physique menée dans des conditions indépendantes. Ce qui est le cas ici. 
+- On peut souvent se passer de l’hypothèse de normalité général quand le nombre le données est important. Ce qui est bien le cas. 
+- La plupart des graphiques montrent bien une répartition linéaire centrèe en 0.
+
+```{r echo=TRUE, fig.height=5, fig.width=10,echo=FALSE}
+res1 <- residuals(m_StepBwdFwd,type="deviance") #résidus de déviance
+res2 <- rstandard(m_StepBwdFwd,type="deviance") #résidus de déviance standardisés
+
+par(mfrow=c(1,2))
+plot(res2,ylab="Residuals")
+abline(h=c(-2,2))
+plot(predict(m_StepBwdFwd,type="r"),res2,xlab="Fitted values",ylab="Residuals")
+abline(h=c(-2,2))
+
+```
+
+
+
+```{r echo=TRUE, fig.height=7, fig.width=10, message=FALSE, warning=FALSE, echo=FALSE}
+funcResiPartial <- function(varRes,varCol)
+{
+residpartiel <- residuals(m_StepBwdFwd,type="partial")
+#On trace les résidus partiels pour la variable age avec :
+plot(varCol,residpartiel[,varRes],cex=0.5, main =varRes, xlab="", ylab="")
+est <- loess(residpartiel[,varRes]~varCol)
+ordre <- order(varCol)
+matlines(varCol[ordre],predict(est)[ordre],col="red")
+abline(lsfit(varCol,residpartiel[,varRes]),lty=2,col="blue")
+}  
+cols<-ncol(m_StepBwdFwd$model)
+par(mfrow=c(2,2))
+for(i in 2:cols)
+{
+varRes<-names(m_StepBwdFwd$model[i])
+varCol<-meteoTrain[,i]
+#if(varRes!="pluie.demain" || i!=8)
+  funcResiPartial(varRes,varCol)
+   if(i %% 4 == 0)
+  {par(mfrow=c(2,2))}
+}
+```
+
+### 6.3 Points influents / abérrants
+
+Il conviendrait d'analyser les points influents/levier et déterminer pourquoi ils le sont.
+Ici on se contente juste de les visualiser.
+
+```{r  echo=FALSE}
+p <- length(m_StepBwdFwd$coef)
+n <- nrow(meteoTrain)
+plot(influence(m_StepBwdFwd)$hat,type="h",ylab="hii")
+abline(h=c(2*p/n,3*p/n),col=c("blue","red"))
+```
+
+```{r include=TRUE}
+which(influence(m_StepBwdFwd)$hat>0.15)
+```
+```{r echo=FALSE}
+plot(cooks.distance(m_StepBwdFwd),type="h",ylab="Distance de Cook", main = "Graphique de la distance de Cook")
+```
+
+```{r include=TRUE}
+which(cooks.distance(m_StepBwdFwd)>0.03)
+```
+
+
+## 7. Prévision - Modèle glm - Tests
+
+### 7.1 Chargement des données de test 
+
+
+```{r include=TRUE}
+ meteoTest= read.csv("meteo.test.csv")
+ meteoTest<-renameCol(meteoTest)
+ summary(meteoTest)
+```
+
+```{r include=FALSE}
+# meteoTest= read.csv("MeteoTestRes.csv")
+# #meteoTest<-renameCol(meteoTest)
+# summary(meteoTest)
+```
+
+### 7.2 prévision
+
+on a la proba p(x) = P(Y=Oui/X=x)
+
+```{r include=TRUE}
+prev_m_StepBwdFwd <- predict(m_StepBwdFwd,newdata = meteoTest, type = "response" )
+summary(prev_m_StepBwdFwd)
+```
+
+```{r include=TRUE}
+prev_m_StepBwdFwd[1:20]
+```
+Si on décide de prédire qu'il pleuvra demain avec un seuil de 0.70.
+Alors les jours: 1, 11, 15, 16, 17, seront prédit avec de la pluie.
+Si on abaisse le seuil à 0.6 on aura en plus les jours: 9, 14, 18, 19 qui seront prédit avec de la pluie.
+
+#### Prévision pour les autres modèles:
+```{r include=TRUE}
+prev_sature <- predict(m_sature,newdata = meteoTest, type = "response" )
+summary(prev_sature)
+prev_m_StepBwd <- predict(m_StepBwd,newdata = meteoTest, type = "response" )
+summary(prev_m_StepBwd)
+prev_m_StepFwd <- predict(m_StepFwd,newdata = meteoTest, type = "response" )
+summary(prev_m_StepFwd)
+prev_PCA <- predict(m_PCA,newdata = meteoTest, type = "response" )
+summary(prev_PCA)
+prev_m_StepBwdFwd_PCA <- predict(m_StepBwdFwd_PCA,newdata = meteoTest, type = "response" )
+summary(prev_m_StepBwdFwd_PCA)
+prev_m_R2aj_PCA <- predict(m_R2aj_PCA,newdata = meteoTest, type = "response" )
+summary(prev_m_R2aj_PCA)
+prev_m_Cp_PCA <- predict(m_Cp_PCA,newdata = meteoTest, type = "response" )
+summary(prev_m_Cp_PCA)
+```
+### 7.3 Probabilité estimée d'avoir pluie.demain=TRUE
+```{r fig.height=5, fig.width=10, echo=FALSE}
+ 
+ m_pred_proba <- data.frame(
+   prev_sature = prev_sature,
+   prev_StepBwdFwd = prev_m_StepBwdFwd,
+   prev_StepBwd = prev_m_StepBwd,
+   prev_StepFwd = prev_m_StepFwd,
+   prev_PCA = prev_PCA,
+   prev_StepBwdFwd.PCA = prev_m_StepBwdFwd_PCA,
+   prev_R2aj.PCA = prev_m_R2aj_PCA,
+   prev_CpMallow.PCA = prev_m_Cp_PCA)
+head(round(m_pred_proba,3),n=7)
+```
+
+### 7.4 Estimation au seuil de 0.5
+On confronte les probabilités obtenues en 6.1 aux seuil de 0.5
+Dés que la prévision dépasse 50% on prédit qu'il pleuvra demain.
+```{r echo=FALSE, fig.height=7, fig.width=10}
+ pluie.demain<-m_pred_proba 
+ m_pred_0.5_All <- apply(m_pred_proba >=0.5, 2, factor,labels=c("FALSE","TRUE"))
+ pluie.demain<-m_pred_proba$prev_StepBwdFwd
+ m_pred_0.5 <- apply(data.frame(pluie.demain) >=0.5, 2, factor,labels=c("FALSE","TRUE"))
+ head(m_pred_0.5_All,n=7)
+```
+
+### 7.5 Concaténation aux données météoTest et constitution du fichier de sortie
+
+```{r renameCol_inv, include= FALSE, echo="FALSE"}
+library(tidyverse)
+renameCol_inv<-function(data)
+{
+ data <- data %>% rename(High.Cloud.Cover.daily.max..high.cld.lay. = CC.high_max)
+ data <- data %>% rename(High.Cloud.Cover.daily.mean..high.cld.lay. = CC.high_mean) 
+ data <- data %>% rename(High.Cloud.Cover.daily.min..high.cld.lay. = CC.high_min)   
+                                     
+ data <- data %>% rename(Low.Cloud.Cover.daily.max..low.cld.lay. = CC.low_max)     
+ data <- data %>% rename(Low.Cloud.Cover.daily.mean..low.cld.lay. = CC.low_mean)    
+ data <- data %>% rename(Low.Cloud.Cover.daily.min..low.cld.lay. = CC.low_min)     
+
+ data <- data %>% rename(Mean.Sea.Level.Pressure.daily.max..MSL. = MSL_max)     
+ data <- data %>% rename(Mean.Sea.Level.Pressure.daily.mean..MSL.= MSL_mean)    
+ data <- data %>% rename(Mean.Sea.Level.Pressure.daily.min..MSL. = MSL_min)   
+ 
+ data <- data %>% rename(Medium.Cloud.Cover.daily.max..mid.cld.lay. = CC.mid_max)  
+ data <- data %>% rename(Medium.Cloud.Cover.daily.mean..mid.cld.lay. = CC.mid_mean) 
+ data <- data %>% rename(Medium.Cloud.Cover.daily.min..mid.cld.lay. = CC.mid_min)  
+
+ data <- data %>% rename(Relative.Humidity.daily.max..2.m.above.gnd. = Humidity_max) 
+ data <- data %>% rename(Relative.Humidity.daily.mean..2.m.above.gnd. = Humidity_mean)
+ data <- data %>% rename(Relative.Humidity.daily.min..2.m.above.gnd. = Humidity_min)   
+
+ data <- data %>% rename(Shortwave.Radiation.daily.sum..sfc. = Radiation_sum)         
+ data <- data %>% rename(Snowfall.amount.raw.daily.sum..sfc.= Snow_sum)         
+ data <- data %>% rename(Sunshine.Duration.daily.sum..sfc. = Sunshine_sum)           
+ 
+ data <- data %>% rename(Temperature.daily.max..2.m.above.gnd. = Temp_max)       
+ data <- data %>% rename(Temperature.daily.mean..2.m.above.gnd. = Temp_mean)      
+ data <- data %>% rename(Temperature.daily.min..2.m.above.gnd. = Temp_min)       
+
+ data <- data %>% rename(Total.Cloud.Cover.daily.max..sfc. = Tot.CC_max)           
+ data <- data %>% rename(Total.Cloud.Cover.daily.mean..sfc. = Tot.CC_mean)          
+ data <- data %>% rename(Total.Cloud.Cover.daily.min..sfc. = Tot.CC_min)      
+ data <- data %>% rename(Total.Precipitation.daily.sum..sfc. = Tot.Prcp_sum)         
+
+ data <- data %>% rename(Wind.Direction.daily.mean..10.m.above.gnd. = WDir.10m_mean)  
+ data <- data %>% rename(Wind.Direction.daily.mean..80.m.above.gnd. = WDir.80m_mean)  
+ data <- data %>% rename(Wind.Direction.daily.mean..900.mb. = WDir.900mb_mean)          
+  
+ data <- data %>% rename(Wind.Gust.daily.max..sfc. = WGust_max)                   
+ data <- data %>% rename(Wind.Gust.daily.mean..sfc. = WGust_mean)                  
+ data <- data %>% rename(Wind.Gust.daily.min..sfc. = WGust_min)       
+  
+ data <- data %>% rename(Wind.Speed.daily.max..10.m.above.gnd. = WS.10m_max)       
+ data <- data %>% rename(Wind.Speed.daily.max..80.m.above.gnd. = WS.80m_max)       
+ data <- data %>% rename(Wind.Speed.daily.max..900.mb. = WS.900mb_max)
+ 
+ data <- data %>% rename(Wind.Speed.daily.mean..10.m.above.gnd. = WS.10m_mean)      
+ data <- data %>% rename(Wind.Speed.daily.mean..80.m.above.gnd. = WS.80m_mean)      
+ data <- data %>% rename(Wind.Speed.daily.mean..900.mb. = WS.900mb_mean )              
+ 
+ data <- data %>% rename(Wind.Speed.daily.min..10.m.above.gnd. = WS.10m_min)      
+ data <- data %>% rename(Wind.Speed.daily.min..80.m.above.gnd. = WS.80m_min)       
+ data <- data %>% rename(Wind.Speed.daily.min..900.mb. = WS.900mb_min)
+ return(data)
+}
+```
+ 
+```{r eval=FALSE}
+meteoTestOut<-meteoTest
+meteoTestOut<-renameCol_inv(meteoTestOut)
+res<-cbind(meteoTestOut,m_pred_0.5)
+res_All<-cbind(meteoTestOut,m_pred_0.5_All)
+
+head(res_All,n=7)
+write.csv(res,"C:\\MeteoPrevision.csv", quote=FALSE)
+write.csv(res_All,"C:\\MeteoPrevision_All.csv", quote=FALSE)
+```
+
+
+## Conclusion
+
+On retient le modèle: m_StepBwdFwd.
+C'est le modèle qui a le meilleur AIC et l'un des critère BIC les plus faible.
+Sinon la pluspart des modèles sont très proches en terme de critère AIC et BIC.
+Seuls les modèles de type step forward sont un peu en retrait.
+Les modèles m_StepBwdFwd, m_StepBwd et m_StepBwdFwd_PCA ont des critères BIC et AIC très voisins.
+
+Il semble normal, d'obtenir un moins bon critère AIC pour notre modèle: m_StepBwdFwd_PCA que pour le modèle : m_StepBwdFwd.
+En effet ces deux modèles sont obtenus par minimisation du critère AIC à partir de la fonction step du package MASS.
+Ils utilisent donc la même méthode. La différence vient de la pré-selection PCA, par rapport au modèle saturé.
+Ainsi notre pré-selection "manuelle" s'est avérée moins performante. Cependant l'écart est très faible.
+
+Tous ces modèles construit à partir du modèle saturé et du modèle issue de l'analyse PCA: m_PCA ont de meilleurs critères que les modèles d'origine. Notamment de meilleurs test anova. Pour les comparaisons anova et BIc, AIC on pourra revenir au §4.5.
+
+Les librairies leaps (avec le critère R2 ajusté et Cp de Mallow - cf 4.3 ) et glmulti (cf. 4.4) n'ont pas apporté l'amélioration attendue.
+Vraissemblablement la pré-sélection effectuée à partir de l'analyse PCA était mal adaptée.
+La libraire glmulti et sa méthode associée est difficilement utilsable, de part le coût de calcul.
+Le maximun de 30 variables est difficilement utilisable, il engendre plusieurs heures de calcul avec 2^29 test de modèles.
+
+On note la compléxité de l'analyse météorologique, avec un très grand nombre de vraiables et la difficulté à réduire leur nombre.
+
+La mise en place d'une (certaine) validation croisée nous a permis d'avoir une certaine idée du pourcentage de réussite.
+Qui se situe autour de 68%-70%. 
+Nous n'avons pas pu utiliser nos données de test pour une validation croisé et une évaluation de performance.
+Nos données de test étant incomplètes: il manque le résultat pluie.demain.
+Pour mener à bien cette comparaison (§5) il a fallu séparer (à nouveaux) les données d'entrainement en 2 jeux de données : dataTest et dataTrain.
+Recalibrer les modèles obtenus à partir du nouveau jeux de données: dataTrain. Puis effectuer les tests sur le jeux dataTest.
+Ceci n'est qu'une approximation et donc à considérer avec retenue. 
+En effet les nouvelles données d'entrainement sont succeptible de produire de nouveaux modèles.
+
+Le fichier résultat : MeteoPrevision_All.csv contient les données de test avec des colonnes supplémentaires qui sont les prédictions de tous ces modèles.
+Le ficher résultat ; MeteoPrevision.csv contient les données de test avec la colonne pluie.demain qui est la prédiction à partir du modèle retenu: m_StepBkwdFwd.
+
+
+
+
