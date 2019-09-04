@@ -19,5 +19,5 @@ Cette V2 est constituée des nouveaux fichiers suivants:
 - Le rapport au format html résultant: GLM_DM.V2.html (incluant le §6.4)
 
 - le fichier de prédiction associé avec tous les modèles: MeteoPrevision_All.V2.csv.  
-Fichier qui contient un modèle supplémentaire avec sa prédiction associée, par raport au fichier MeteoPrevision_All.csv
+Fichier qui contient un modèle supplémentaire avec sa prédiction associée, par rapport au fichier MeteoPrevision_All.csv
 
