@@ -1677,8 +1677,6 @@ abline(h=c(-2,2))
 
 ```
 
-
-
 ```{r echo=TRUE, fig.height=7, fig.width=10, message=FALSE, warning=FALSE, echo=FALSE}
 funcResiPartial <- function(varRes,varCol)
 {
@@ -1740,14 +1738,15 @@ dataStepBkwFwd_BIC=cbind(meteoTrain$Temp_mean, meteoTrain$Temp_min, meteoTrain$S
                           meteoTrain$WS.80m_mean, meteoTrain$WDir.900mb_mean,  meteoTrain$WS.900mb_max,   
                           meteoTrain$WS.10m_min,  meteoTrain$WGust_max,  meteoTrain$pluie.demain)
 
-colnames(dataStepBkwFwd_BIC) <- c("Temp_mean", "Temp_min","Snow_sum",
-                                  "MSL_max","CC.low_mean",  "Tot.CC_max","Tot.CC_min", "CC.high_max", "CC.mid_max","CC.low_min",
+colnames(dataStepBkwFwd_BIC) <- c("Temp_mean", "Temp_min","Snow_sum", "MSL_max",
+                                  "CC.low_mean",  "Tot.CC_max","Tot.CC_min", "CC.high_max", "CC.mid_max","CC.low_min",
                                   "WS.80m_mean","WDir.900mb_mean","WS.900mb_max", "WS.10m_min","WGust_max", "pluie.demain")
 
 bestglm(data.frame(dataStepBkwFwd_BIC), IC="BIC",  family=binomial)
 ```
 
 Avec bestglm et l'option (IC="BIC") on obtient le modèle réduit suivant:
+
 ```{r include=TRUE}
 
   m_StepBwdFwd_BIC<-glm(formula = pluie.demain ~ 
@@ -1756,12 +1755,6 @@ Avec bestglm et l'option (IC="BIC") on obtient le modèle réduit suivant:
                         WS.80m_mean + WDir.900mb_mean + WS.10m_min + WGust_max, 
                         family = binomial,data = meteoTrain )
 
-  m_StepBwdFwd_BIC2<-glm(formula = pluie.demain ~ 
-                        Temp_mean   +  MSL_max  + 
-                        Tot.CC_min + CC.mid_max + CC.low_min + 
-                        WS.80m_mean + WDir.900mb_mean + WS.10m_min + WGust_max, 
-                        family = binomial,data = meteoTrain )
-  
 AIC(m_StepBwdFwd_BIC)
 BIC(m_StepBwdFwd_BIC)
 summary(m_StepBwdFwd_BIC)
@@ -2014,8 +2007,8 @@ En effet, un jeux de données d'entrainement réduit et différent est succeptib
 Dans cette version V2, on a ajouté un modèle supplémentaire, issu d'une sélection BIC à partir du package bestglm.  
 On a donc un modèle supplémentaire dans nos prédictions, resumées dans le fichier: MeteoPrevision_All.V2.csv.
 
-Le fichier résultat : MeteoPrevision_All.V2.csv contient les données de test avec des colonnes supplémentaires qui sont les prédictions de tous ces modèles.
-Le ficher résultat ; MeteoPrevision.csv contient les données de test avec la colonne pluie.demain qui est la prédiction à partir du modèle retenu: m_StepBkwdFwd.
+Le fichier résultat: MeteoPrevision_All.V2.csv contient les données de test avec des colonnes supplémentaires qui sont les prédictions de tous ces modèles.
+Le ficher résultat: MeteoPrevision.csv contient les données de test avec la colonne pluie.demain qui est la prédiction à partir du modèle retenu: m_StepBkwdFwd.
 
 
 
