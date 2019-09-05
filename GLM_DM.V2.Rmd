@@ -1630,7 +1630,7 @@ colnames(dataStepBkwFwd) <- c("Temp_mean", "Temp_min","Snow_sum",
                  "MSL_max","CC.low_mean",  "Tot.CC_max","Tot.CC_min", "CC.high_max", "CC.mid_max","CC.low_min",
                  "WS.80m_mean","WDir.900mb_mean","WS.900mb_max", "WS.10m_min","WGust_max")
 my_cols <- c("#00AFBB", "#E7B800")
-pairs(dataStepBkwFwd, pch ='.', my_cols[meteoTrain$pluie.demain])
+pairs(dataStepBkwFwd, pch ='.')
 
 ```
 
